@@ -48,7 +48,7 @@ export default function MapPage() {
   const [isMobile, setIsMobile] = useState(false)
   const [mapCenter] = useState<[number, number]>([36.7783, -119.4179])
   const [mapZoom] = useState(6)
-  const [filterMode, setFilterMode] = useState<'upcoming' | 'all'>('upcoming')
+  const [filterMode, setFilterMode] = useState<'upcoming' | 'all'>('all')
   const [mounted, setMounted] = useState(false)
 
   // Mark component as mounted (client-side only)
@@ -64,6 +64,58 @@ export default function MapPage() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Lock body scroll when drawer is open on mobile
+  useEffect(() => {
+    if (isMobile && showDrawer) {
+      const scrollY = window.scrollY
+      const originalOverflow = document.body.style.overflow
+      const originalPosition = document.body.style.position
+      const originalTop = document.body.style.top
+      const originalWidth = document.body.style.width
+      
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.width = '100%'
+      document.body.style.touchAction = 'none'
+      
+      return () => {
+        document.body.style.overflow = originalOverflow
+        document.body.style.position = originalPosition
+        document.body.style.top = originalTop
+        document.body.style.width = originalWidth
+        document.body.style.touchAction = ''
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [isMobile, showDrawer])
+
+  // Lock body scroll when detail modal is open on mobile
+  useEffect(() => {
+    if (isMobile && detailCheckpoint) {
+      const scrollY = window.scrollY
+      const originalOverflow = document.body.style.overflow
+      const originalPosition = document.body.style.position
+      const originalTop = document.body.style.top
+      const originalWidth = document.body.style.width
+      
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.width = '100%'
+      document.body.style.touchAction = 'none'
+      
+      return () => {
+        document.body.style.overflow = originalOverflow
+        document.body.style.position = originalPosition
+        document.body.style.top = originalTop
+        document.body.style.width = originalWidth
+        document.body.style.touchAction = ''
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [isMobile, detailCheckpoint])
+
   // Fetch checkpoints
   useEffect(() => {
     fetchCheckpoints()
@@ -75,11 +127,22 @@ export default function MapPage() {
       const response = await fetch('/api/dui-checkpoints')
       const data = await response.json()
       
+      console.log('API Response:', data)
+      
       if (data.success && data.checkpoints) {
+        console.log('Fetched checkpoints:', data.checkpoints.length)
         setCheckpoints(data.checkpoints)
+      } else if (data.error) {
+        console.error('API Error:', data.error, data.details)
+        // Still set empty array to show "no checkpoints" message
+        setCheckpoints([])
+      } else {
+        console.warn('Unexpected response format:', data)
+        setCheckpoints([])
       }
     } catch (error) {
       console.error('Error fetching checkpoints:', error)
+      setCheckpoints([])
     } finally {
       setLoading(false)
     }
@@ -87,17 +150,19 @@ export default function MapPage() {
 
   // Filter checkpoints (only after component is mounted to avoid SSR date issues)
   const filteredCheckpoints = useMemo(() => {
-    if (!mounted) return []
+    if (checkpoints.length === 0) return []
     
-    let filtered = checkpoints
+    let filtered = [...checkpoints]
 
-    // Apply upcoming/all filter
-    if (filterMode === 'upcoming') {
+    // Apply upcoming/all filter (only after mounted to avoid SSR date issues)
+    if (mounted && filterMode === 'upcoming') {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       filtered = filtered.filter(cp => {
-        const cpDate = cp.Date ? new Date(cp.Date) : null
-        return cpDate && cpDate >= today
+        if (!cp.Date) return false
+        const cpDate = new Date(cp.Date)
+        cpDate.setHours(0, 0, 0, 0)
+        return cpDate >= today
       })
     }
 
@@ -338,7 +403,16 @@ export default function MapPage() {
   )
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div 
+      className="h-screen flex flex-col bg-gray-50"
+      style={isMobile && (showDrawer || detailCheckpoint) ? { 
+        position: 'fixed', 
+        width: '100%', 
+        height: '100%',
+        overflow: 'hidden',
+        touchAction: 'none'
+      } : {}}
+    >
       {/* Header - Desktop: Full header with phone, Mobile: Centered logo */}
       <header className="bg-brand-blue-grey py-3 px-4 shadow-lg z-50 flex-shrink-0">
         <div className="max-w-7xl mx-auto flex items-center justify-center md:justify-between">
@@ -436,44 +510,84 @@ export default function MapPage() {
           {/* Backdrop */}
           <div 
             className="fixed inset-0 bg-black/50"
-            style={{ zIndex: 10001 }}
+            style={{ zIndex: 10001, touchAction: 'none' }}
             onClick={() => setShowDrawer(false)}
+            onTouchMove={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}
           />
           
           {/* Drawer from Bottom */}
           <div 
+            id="checkpoint-drawer"
             className="fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
-            style={{ zIndex: 10002, maxHeight: '85vh' }}
-            onTouchStart={(e) => {
-              const touch = e.touches[0]
-              const startY = touch.clientY
-              const drawer = e.currentTarget
-              let currentY = startY
-              
-              const handleMove = (moveEvent: TouchEvent) => {
-                currentY = moveEvent.touches[0].clientY
-                const diff = currentY - startY
-                if (diff > 0) {
-                  drawer.style.transform = `translateY(${diff}px)`
-                }
-              }
-              
-              const handleEnd = () => {
-                const diff = currentY - startY
-                if (diff > 100) {
-                  setShowDrawer(false)
-                }
-                drawer.style.transform = ''
-                document.removeEventListener('touchmove', handleMove)
-                document.removeEventListener('touchend', handleEnd)
-              }
-              
-              document.addEventListener('touchmove', handleMove)
-              document.addEventListener('touchend', handleEnd)
-            }}
+            style={{ zIndex: 10002, maxHeight: '85vh', touchAction: 'pan-y' }}
           >
-            {/* Drawer Handle - Drag indicator */}
-            <div className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
+            {/* Drawer Handle - ONLY this area is draggable */}
+            <div 
+              className="flex justify-center pt-4 pb-3 cursor-grab active:cursor-grabbing"
+              style={{ touchAction: 'none' }}
+              onTouchStart={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                
+                // Lock body scroll
+                const body = document.body
+                const originalOverflow = body.style.overflow
+                const originalPosition = body.style.position
+                const scrollY = window.scrollY
+                body.style.overflow = 'hidden'
+                body.style.position = 'fixed'
+                body.style.width = '100%'
+                body.style.top = `-${scrollY}px`
+                
+                const touch = e.touches[0]
+                const startY = touch.clientY
+                const drawer = document.getElementById('checkpoint-drawer')
+                if (!drawer) return
+                let currentY = startY
+                
+                const handleMove = (moveEvent: TouchEvent) => {
+                  moveEvent.preventDefault()
+                  moveEvent.stopPropagation()
+                  currentY = moveEvent.touches[0].clientY
+                  const diff = currentY - startY
+                  if (diff > 0) {
+                    drawer.style.transform = `translateY(${diff}px)`
+                    drawer.style.transition = 'none'
+                  }
+                }
+                
+                const handleEnd = () => {
+                  const diff = currentY - startY
+                  drawer.style.transition = 'transform 0.3s ease-out'
+                  if (diff > 80) {
+                    drawer.style.transform = 'translateY(100%)'
+                    setTimeout(() => {
+                      setShowDrawer(false)
+                      // Restore body scroll
+                      body.style.overflow = originalOverflow
+                      body.style.position = originalPosition
+                      body.style.width = ''
+                      body.style.top = ''
+                      window.scrollTo(0, scrollY)
+                    }, 300)
+                  } else {
+                    drawer.style.transform = 'translateY(0)'
+                    // Restore body scroll
+                    body.style.overflow = originalOverflow
+                    body.style.position = originalPosition
+                    body.style.width = ''
+                    body.style.top = ''
+                    window.scrollTo(0, scrollY)
+                  }
+                  document.removeEventListener('touchmove', handleMove, { capture: true })
+                  document.removeEventListener('touchend', handleEnd, { capture: true })
+                }
+                
+                document.addEventListener('touchmove', handleMove, { passive: false, capture: true })
+                document.addEventListener('touchend', handleEnd, { capture: true })
+              }}
+            >
               <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
             </div>
 
@@ -486,7 +600,10 @@ export default function MapPage() {
             </div>
             
             {/* Drawer Content */}
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div 
+              className="flex-1 overflow-hidden flex flex-col"
+              style={{ touchAction: 'pan-y' }}
+            >
               <CheckpointList />
             </div>
           </div>
@@ -503,35 +620,9 @@ export default function MapPage() {
           <div className="absolute inset-0 bg-black/50" />
           
           <div 
+            id="detail-modal"
             className="relative bg-white w-full md:max-w-lg md:mx-4 md:rounded-xl rounded-t-2xl max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom duration-300"
             onClick={(e) => e.stopPropagation()}
-            onTouchStart={isMobile ? (e) => {
-              const touch = e.touches[0]
-              const startY = touch.clientY
-              const modal = e.currentTarget
-              let currentY = startY
-              
-              const handleMove = (moveEvent: TouchEvent) => {
-                currentY = moveEvent.touches[0].clientY
-                const diff = currentY - startY
-                if (diff > 0) {
-                  modal.style.transform = `translateY(${diff}px)`
-                }
-              }
-              
-              const handleEnd = () => {
-                const diff = currentY - startY
-                if (diff > 100) {
-                  setDetailCheckpoint(null)
-                }
-                modal.style.transform = ''
-                document.removeEventListener('touchmove', handleMove)
-                document.removeEventListener('touchend', handleEnd)
-              }
-              
-              document.addEventListener('touchmove', handleMove)
-              document.addEventListener('touchend', handleEnd)
-            } : undefined}
           >
             {/* Color bar based on county */}
             <div 
@@ -539,8 +630,72 @@ export default function MapPage() {
               style={{ backgroundColor: getCountyColor(detailCheckpoint.County) }}
             />
             
-            {/* Handle - Drag indicator on mobile */}
-            <div className="md:hidden flex justify-center pt-3 cursor-grab active:cursor-grabbing">
+            {/* Handle - Drag indicator on mobile - ONLY this area is draggable */}
+            <div 
+              className="md:hidden flex justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing"
+              style={{ touchAction: 'none' }}
+              onTouchStart={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                
+                // Lock body scroll
+                const body = document.body
+                const originalOverflow = body.style.overflow
+                const originalPosition = body.style.position
+                const scrollY = window.scrollY
+                body.style.overflow = 'hidden'
+                body.style.position = 'fixed'
+                body.style.width = '100%'
+                body.style.top = `-${scrollY}px`
+                
+                const touch = e.touches[0]
+                const startY = touch.clientY
+                const modal = document.getElementById('detail-modal')
+                if (!modal) return
+                let currentY = startY
+                
+                const handleMove = (moveEvent: TouchEvent) => {
+                  moveEvent.preventDefault()
+                  moveEvent.stopPropagation()
+                  currentY = moveEvent.touches[0].clientY
+                  const diff = currentY - startY
+                  if (diff > 0) {
+                    modal.style.transform = `translateY(${diff}px)`
+                    modal.style.transition = 'none'
+                  }
+                }
+                
+                const handleEnd = () => {
+                  const diff = currentY - startY
+                  modal.style.transition = 'transform 0.3s ease-out'
+                  if (diff > 80) {
+                    modal.style.transform = 'translateY(100%)'
+                    setTimeout(() => {
+                      setDetailCheckpoint(null)
+                      // Restore body scroll
+                      body.style.overflow = originalOverflow
+                      body.style.position = originalPosition
+                      body.style.width = ''
+                      body.style.top = ''
+                      window.scrollTo(0, scrollY)
+                    }, 300)
+                  } else {
+                    modal.style.transform = 'translateY(0)'
+                    // Restore body scroll
+                    body.style.overflow = originalOverflow
+                    body.style.position = originalPosition
+                    body.style.width = ''
+                    body.style.top = ''
+                    window.scrollTo(0, scrollY)
+                  }
+                  document.removeEventListener('touchmove', handleMove, { capture: true })
+                  document.removeEventListener('touchend', handleEnd, { capture: true })
+                }
+                
+                document.addEventListener('touchmove', handleMove, { passive: false, capture: true })
+                document.addEventListener('touchend', handleEnd, { capture: true })
+              }}
+            >
               <div className="w-10 h-1 bg-gray-300 rounded-full" />
             </div>
 
