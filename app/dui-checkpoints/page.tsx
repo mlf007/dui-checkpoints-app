@@ -47,6 +47,30 @@ export default function CheckpointsPage() {
     return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
 
+  // Send height to parent window for iframe embedding
+  useEffect(() => {
+    const sendHeight = () => {
+      const height = document.documentElement.scrollHeight
+      window.parent.postMessage({ type: 'resize', height }, '*')
+    }
+
+    // Send initial height after content loads
+    const timer = setTimeout(sendHeight, 100)
+
+    // Send height on resize
+    window.addEventListener('resize', sendHeight)
+    
+    // Use ResizeObserver to detect content size changes
+    const resizeObserver = new ResizeObserver(sendHeight)
+    resizeObserver.observe(document.body)
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', sendHeight)
+      resizeObserver.disconnect()
+    }
+  })
+
   useEffect(() => {
     fetchCheckpoints()
   }, [])
