@@ -50,6 +50,12 @@ export default function MapPage() {
   const [mapCenter] = useState<[number, number]>([36.7783, -119.4179])
   const [mapZoom] = useState(6)
   const [filterMode, setFilterMode] = useState<'upcoming' | 'all'>('upcoming')
+  const [mounted, setMounted] = useState(false)
+
+  // Mark component as mounted (client-side only)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Detect mobile
   useEffect(() => {
@@ -80,8 +86,10 @@ export default function MapPage() {
     }
   }
 
-  // Filter checkpoints
+  // Filter checkpoints (only after component is mounted to avoid SSR date issues)
   const filteredCheckpoints = useMemo(() => {
+    if (!mounted) return []
+    
     let filtered = checkpoints
 
     // Apply upcoming/all filter
@@ -110,7 +118,7 @@ export default function MapPage() {
       const dateB = b.Date ? new Date(b.Date).getTime() : 0
       return dateA - dateB
     })
-  }, [checkpoints, searchQuery, filterMode])
+  }, [checkpoints, searchQuery, filterMode, mounted])
 
   // Get user location
   const getUserLocation = useCallback(() => {
@@ -135,22 +143,22 @@ export default function MapPage() {
     )
   }, [])
 
-  // Check if checkpoint is today
-  const isToday = (dateString: string | null) => {
-    if (!dateString) return false
+  // Check if checkpoint is today (only run on client)
+  const isToday = useCallback((dateString: string | null) => {
+    if (!mounted || !dateString) return false
     const checkpointDate = new Date(dateString)
     const today = new Date()
     return checkpointDate.toDateString() === today.toDateString()
-  }
+  }, [mounted])
 
-  // Check if checkpoint is upcoming
-  const isUpcoming = (dateString: string | null) => {
-    if (!dateString) return false
+  // Check if checkpoint is upcoming (only run on client)
+  const isUpcoming = useCallback((dateString: string | null) => {
+    if (!mounted || !dateString) return false
     const checkpointDate = new Date(dateString)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return checkpointDate >= today
-  }
+  }, [mounted])
 
   // Format date
   const formatDate = (dateString: string | null) => {
