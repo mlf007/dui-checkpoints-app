@@ -437,22 +437,19 @@ export default function MapPage() {
       )}
 
       {/* Mobile Bottom Drawer */}
-      {isMobile && (
+      {isMobile && showDrawer && (
         <>
           {/* Backdrop */}
-          {showDrawer && (
-            <div 
-              className="fixed inset-0 bg-black/50 z-[60]"
-              onClick={() => setShowDrawer(false)}
-            />
-          )}
+          <div 
+            className="fixed inset-0 bg-black/50"
+            style={{ zIndex: 10001 }}
+            onClick={() => setShowDrawer(false)}
+          />
           
           {/* Drawer from Bottom */}
           <div 
-            className={`fixed inset-x-0 bottom-0 bg-white z-[70] rounded-t-3xl shadow-2xl transform transition-transform duration-300 ease-out flex flex-col ${
-              showDrawer ? 'translate-y-0' : 'translate-y-full'
-            }`}
-            style={{ maxHeight: '85vh' }}
+            className="fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
+            style={{ zIndex: 10002, maxHeight: '85vh' }}
           >
             {/* Drawer Handle */}
             <div className="flex justify-center pt-3 pb-2">
