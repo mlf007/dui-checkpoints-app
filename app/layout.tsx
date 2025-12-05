@@ -9,8 +9,13 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "The Meehan Law Firm DUI Checkpoints",
-  description: "The Meehan Law Firm DUI Checkpoints",
+  title: "The Meehan Law Firm DUI Locator",
+  description: "Find DUI checkpoints near you - The Meehan Law Firm",
+  icons: {
+    icon: '/fav.png',
+    shortcut: '/fav.png',
+    apple: '/fav.png',
+  },
 };
 
 const geistSans = Geist({

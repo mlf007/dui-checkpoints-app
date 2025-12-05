@@ -327,11 +327,11 @@ export default function MapPage() {
           <p className="text-xs text-gray-300">The Meehan Law Firm is here to help 24/7</p>
         </div>
         <a 
-          href="tel:+1234567890"
+          href="tel:8444384786"
           className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
         >
           <Phone className="h-5 w-5" />
-          Call Now - Free Consultation
+          (844) 4-DUI STOP
         </a>
       </div>
     </>
@@ -339,34 +339,28 @@ export default function MapPage() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header - Desktop: Logo only, Mobile: Logo on primary bg */}
+      {/* Header - Desktop: Full header with phone, Mobile: Centered logo */}
       <header className="bg-brand-blue-grey py-3 px-4 shadow-lg z-50 flex-shrink-0">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Logo */}
+        <div className="max-w-7xl mx-auto flex items-center justify-center md:justify-between">
+          {/* Logo - centered on mobile */}
           <img 
             src={LOGO_URL} 
             alt="Meehan Law Firm" 
             className="h-10 md:h-12 w-auto"
           />
           
-          {/* Desktop Only - Right side buttons */}
+          {/* Desktop Only - Phone number display like screenshot */}
           {!isMobile && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={getUserLocation}
-                disabled={isLocating}
-                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-              >
-                <Locate className={`h-4 w-4 ${isLocating ? 'animate-pulse' : ''}`} />
-                {isLocating ? 'Locating...' : 'Find Me'}
-              </button>
-              
+            <div className="flex items-center gap-4">
               <a 
-                href="tel:+1234567890"
-                className="bg-brand-orange hover:bg-brand-orange/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                href="tel:8444384786"
+                className="flex items-center gap-2 text-white"
               >
-                <Phone className="h-4 w-4" />
-                Get Legal Help
+                <span className="text-2xl font-bold tracking-wide">
+                  <span className="text-white">(844) 4-</span>
+                  <span className="text-brand-orange">DUI</span>
+                  <span className="text-white"> STOP</span>
+                </span>
               </a>
             </div>
           )}
@@ -396,29 +390,29 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation - iOS Style Floating */}
+      {/* Mobile Bottom Navigation - iOS Style Floating - Smaller */}
       {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 pb-6 px-4 pt-2 bg-gradient-to-t from-white/90 to-transparent" style={{ zIndex: 9999 }}>
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 flex items-center justify-between px-3 py-2">
+        <div className="fixed bottom-0 left-0 right-0 pb-4 px-3 pt-1 bg-gradient-to-t from-white/90 to-transparent" style={{ zIndex: 9999 }}>
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 flex items-center justify-between px-2 py-1.5">
             {/* Left - GPS Button */}
             <button
               onClick={getUserLocation}
               disabled={isLocating}
-              className="flex flex-col items-center justify-center w-16 h-14 rounded-xl hover:bg-gray-100 transition-colors"
+              className="flex flex-col items-center justify-center w-14 h-11 rounded-xl hover:bg-gray-100 transition-colors"
             >
-              <Navigation className={`h-6 w-6 text-brand-blue-grey ${isLocating ? 'animate-pulse' : ''}`} />
-              <span className="text-[10px] text-gray-600 mt-1">Locate</span>
+              <Navigation className={`h-5 w-5 text-brand-blue-grey ${isLocating ? 'animate-pulse' : ''}`} />
+              <span className="text-[9px] text-gray-600 mt-0.5">Locate</span>
             </button>
 
             {/* Center - Plus Button (Opens Drawer) */}
             <button
               onClick={() => setShowDrawer(true)}
-              className="relative -mt-10 flex items-center justify-center w-16 h-16 bg-brand-orange rounded-full shadow-xl hover:bg-brand-orange/90 transition-all active:scale-95 border-4 border-white"
+              className="relative -mt-7 flex items-center justify-center w-14 h-14 bg-brand-orange rounded-full shadow-xl hover:bg-brand-orange/90 transition-all active:scale-95 border-4 border-white"
             >
-              <Plus className="h-8 w-8 text-white" />
+              <Plus className="h-7 w-7 text-white" />
               {/* Badge */}
               {filteredCheckpoints.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-md">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md">
                   {filteredCheckpoints.length > 99 ? '99+' : filteredCheckpoints.length}
                 </span>
               )}
@@ -426,17 +420,17 @@ export default function MapPage() {
 
             {/* Right - Call Button */}
             <a
-              href="tel:+1234567890"
-              className="flex flex-col items-center justify-center w-16 h-14 rounded-xl hover:bg-gray-100 transition-colors"
+              href="tel:8444384786"
+              className="flex flex-col items-center justify-center w-14 h-11 rounded-xl hover:bg-gray-100 transition-colors"
             >
-              <Phone className="h-6 w-6 text-brand-orange" />
-              <span className="text-[10px] text-gray-600 mt-1">Call</span>
+              <Phone className="h-5 w-5 text-brand-orange" />
+              <span className="text-[9px] text-gray-600 mt-0.5">Call</span>
             </a>
           </div>
         </div>
       )}
 
-      {/* Mobile Bottom Drawer */}
+      {/* Mobile Bottom Drawer with Drag-to-Close */}
       {isMobile && showDrawer && (
         <>
           {/* Backdrop */}
@@ -450,24 +444,45 @@ export default function MapPage() {
           <div 
             className="fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
             style={{ zIndex: 10002, maxHeight: '85vh' }}
+            onTouchStart={(e) => {
+              const touch = e.touches[0]
+              const startY = touch.clientY
+              const drawer = e.currentTarget
+              let currentY = startY
+              
+              const handleMove = (moveEvent: TouchEvent) => {
+                currentY = moveEvent.touches[0].clientY
+                const diff = currentY - startY
+                if (diff > 0) {
+                  drawer.style.transform = `translateY(${diff}px)`
+                }
+              }
+              
+              const handleEnd = () => {
+                const diff = currentY - startY
+                if (diff > 100) {
+                  setShowDrawer(false)
+                }
+                drawer.style.transform = ''
+                document.removeEventListener('touchmove', handleMove)
+                document.removeEventListener('touchend', handleEnd)
+              }
+              
+              document.addEventListener('touchmove', handleMove)
+              document.addEventListener('touchend', handleEnd)
+            }}
           >
-            {/* Drawer Handle */}
-            <div className="flex justify-center pt-3 pb-2">
+            {/* Drawer Handle - Drag indicator */}
+            <div className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
               <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
             </div>
 
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-100">
+            {/* Drawer Header - No X button */}
+            <div className="flex items-center px-4 pb-3 border-b border-gray-100">
               <div>
                 <h2 className="text-lg font-bold text-brand-heading">DUI Checkpoints</h2>
                 <p className="text-xs text-gray-500">{filteredCheckpoints.length} locations found</p>
               </div>
-              <button 
-                onClick={() => setShowDrawer(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
             </div>
             
             {/* Drawer Content */}
@@ -490,6 +505,33 @@ export default function MapPage() {
           <div 
             className="relative bg-white w-full md:max-w-lg md:mx-4 md:rounded-xl rounded-t-2xl max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom duration-300"
             onClick={(e) => e.stopPropagation()}
+            onTouchStart={isMobile ? (e) => {
+              const touch = e.touches[0]
+              const startY = touch.clientY
+              const modal = e.currentTarget
+              let currentY = startY
+              
+              const handleMove = (moveEvent: TouchEvent) => {
+                currentY = moveEvent.touches[0].clientY
+                const diff = currentY - startY
+                if (diff > 0) {
+                  modal.style.transform = `translateY(${diff}px)`
+                }
+              }
+              
+              const handleEnd = () => {
+                const diff = currentY - startY
+                if (diff > 100) {
+                  setDetailCheckpoint(null)
+                }
+                modal.style.transform = ''
+                document.removeEventListener('touchmove', handleMove)
+                document.removeEventListener('touchend', handleEnd)
+              }
+              
+              document.addEventListener('touchmove', handleMove)
+              document.addEventListener('touchend', handleEnd)
+            } : undefined}
           >
             {/* Color bar based on county */}
             <div 
@@ -497,12 +539,12 @@ export default function MapPage() {
               style={{ backgroundColor: getCountyColor(detailCheckpoint.County) }}
             />
             
-            {/* Handle */}
-            <div className="md:hidden flex justify-center pt-3">
+            {/* Handle - Drag indicator on mobile */}
+            <div className="md:hidden flex justify-center pt-3 cursor-grab active:cursor-grabbing">
               <div className="w-10 h-1 bg-gray-300 rounded-full" />
             </div>
 
-            {/* Header */}
+            {/* Header - X button only on desktop */}
             <div className="flex items-start justify-between p-4 border-b">
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -522,9 +564,10 @@ export default function MapPage() {
                   {detailCheckpoint.County}
                 </p>
               </div>
+              {/* X button only on desktop */}
               <button
                 onClick={() => setDetailCheckpoint(null)}
-                className="p-2 hover:bg-gray-100 rounded-full"
+                className="p-2 hover:bg-gray-100 rounded-full hidden md:block"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -579,7 +622,7 @@ export default function MapPage() {
                 </a>
               )}
               <a
-                href="tel:+1234567890"
+                href="tel:8444384786"
                 className="flex-1 py-3 bg-brand-orange hover:bg-brand-orange/90 rounded-lg font-semibold text-white text-center flex items-center justify-center gap-2 transition-colors"
               >
                 <Phone className="h-4 w-4" />
