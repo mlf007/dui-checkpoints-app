@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LayoutGrid, List, Search, Filter, ChevronLeft, ChevronRight, MapPin, Calendar, Clock, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
+import { LayoutGrid, List, Search, Filter, ChevronLeft, ChevronRight, MapPin, Calendar, Clock, ChevronDown, ChevronUp, X, Eye } from 'lucide-react'
 import type { Checkpoint } from '@/lib/types/checkpoint'
 
 export default function CheckpointsPage() {
@@ -24,6 +24,8 @@ export default function CheckpointsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null)
   const itemsPerPage = 10
 
   // Detect mobile/tablet view and set default view mode
@@ -303,7 +305,7 @@ export default function CheckpointsPage() {
                         <th className="px-6 py-4 text-left text-sm font-semibold">Location</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Date</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Time</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold">Source</th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold">Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -315,44 +317,73 @@ export default function CheckpointsPage() {
                         </tr>
                       ) : (
                         paginatedCheckpoints.map((checkpoint) => (
-                          <tr
-                            key={checkpoint.id}
-                            className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                          >
-                            <td className="px-6 py-4 text-sm font-medium text-brand-heading dark:text-white">
-                              {checkpoint.City || 'N/A'}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-brand-paragraph dark:text-gray-300">
-                              {checkpoint.County || 'N/A'}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-brand-paragraph dark:text-gray-300 max-w-xs truncate">
-                              {checkpoint.Location || 'Undisclosed'}
-                            </td>
-                            <td className="px-6 py-4 text-sm whitespace-nowrap">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                isUpcoming(checkpoint.Date)
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                              }`}>
-                                {formatDate(checkpoint.Date)}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-brand-paragraph dark:text-gray-300 whitespace-nowrap">
-                              {checkpoint.Time || 'N/A'}
-                            </td>
-                            <td className="px-6 py-4 text-sm">
-                              {checkpoint.Source && (
-                                <a
-                                  href={checkpoint.Source}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-brand-orange hover:underline inline-flex items-center gap-1"
+                          <>
+                            <tr
+                              key={checkpoint.id}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                              <td className="px-6 py-4 text-sm font-medium text-brand-heading dark:text-white">
+                                {checkpoint.City || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-brand-paragraph dark:text-gray-300">
+                                {checkpoint.County || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-brand-paragraph dark:text-gray-300 max-w-xs truncate">
+                                {checkpoint.Location || 'Undisclosed'}
+                              </td>
+                              <td className="px-6 py-4 text-sm whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  isUpcoming(checkpoint.Date)
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                }`}>
+                                  {formatDate(checkpoint.Date)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-brand-paragraph dark:text-gray-300 whitespace-nowrap">
+                                {checkpoint.Time || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                <button
+                                  onClick={() => setExpandedRow(expandedRow === checkpoint.id ? null : checkpoint.id)}
+                                  className="text-brand-orange hover:text-brand-orange/80 inline-flex items-center gap-1 font-medium transition-colors"
                                 >
-                                  View <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
-                            </td>
-                          </tr>
+                                  <Eye className="h-4 w-4" />
+                                  View
+                                  {expandedRow === checkpoint.id ? (
+                                    <ChevronUp className="h-3 w-3" />
+                                  ) : (
+                                    <ChevronDown className="h-3 w-3" />
+                                  )}
+                                </button>
+                              </td>
+                            </tr>
+                            {/* Accordion Row for Description */}
+                            {expandedRow === checkpoint.id && (
+                              <tr key={`${checkpoint.id}-details`} className="bg-gray-50 dark:bg-gray-800/50">
+                                <td colSpan={6} className="px-6 py-4">
+                                  <div className="animate-in slide-in-from-top-2 duration-200">
+                                    <h4 className="text-sm font-semibold text-brand-heading dark:text-white mb-2">
+                                      Description
+                                    </h4>
+                                    <p className="text-sm text-brand-paragraph dark:text-gray-300 whitespace-pre-line leading-relaxed">
+                                      {checkpoint.Description || 'No description available.'}
+                                    </p>
+                                    {checkpoint.Source && (
+                                      <a
+                                        href={checkpoint.Source}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 mt-3 text-sm text-brand-orange hover:underline"
+                                      >
+                                        View Original Source →
+                                      </a>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
                         ))
                       )}
                     </tbody>
@@ -492,18 +523,15 @@ export default function CheckpointsPage() {
                         </div>
                       </div>
 
-                      {checkpoint.Source && (
-                        <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-                          <a
-                            href={checkpoint.Source}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-brand-orange hover:underline inline-flex items-center gap-1"
-                          >
-                            View Source <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </div>
-                      )}
+                      <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <button
+                          onClick={() => setSelectedCheckpoint(checkpoint)}
+                          className="text-sm text-brand-orange hover:text-brand-orange/80 inline-flex items-center gap-1 font-medium transition-colors"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View Details
+                        </button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))
@@ -575,6 +603,124 @@ export default function CheckpointsPage() {
           </>
         )}
       </main>
+
+      {/* Mobile Dialog for Checkpoint Details */}
+      {selectedCheckpoint && (
+        <div 
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+          onClick={() => setSelectedCheckpoint(null)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50 animate-in fade-in duration-200" />
+          
+          {/* Dialog */}
+          <div 
+            className="relative bg-white dark:bg-gray-900 w-full md:max-w-lg md:mx-4 md:rounded-lg rounded-t-2xl max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom duration-300 md:slide-in-from-bottom-0 md:zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle bar for mobile */}
+            <div className="md:hidden flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+            </div>
+            
+            {/* Header */}
+            <div className="flex items-start justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-xl font-bold text-brand-heading dark:text-white">
+                  {selectedCheckpoint.City || 'Unknown City'}
+                </h3>
+                <p className="text-sm text-brand-orange font-medium mt-1">
+                  {selectedCheckpoint.County || 'Unknown County'}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCheckpoint(null)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <div className="space-y-4">
+                {/* Location */}
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 text-brand-orange mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-brand-paragraph dark:text-gray-400 uppercase mb-1">
+                      Location
+                    </p>
+                    <p className="text-sm text-brand-heading dark:text-white">
+                      {selectedCheckpoint.Location || 'Location not specified'}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Date */}
+                <div className="flex items-start gap-3">
+                  <Calendar className="h-5 w-5 text-brand-orange mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-brand-paragraph dark:text-gray-400 uppercase mb-1">
+                      Date
+                    </p>
+                    <p className="text-sm text-brand-heading dark:text-white font-medium">
+                      {formatDate(selectedCheckpoint.Date)}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Time */}
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-brand-orange mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-brand-paragraph dark:text-gray-400 uppercase mb-1">
+                      Time
+                    </p>
+                    <p className="text-sm text-brand-heading dark:text-white">
+                      {selectedCheckpoint.Time || 'Time not specified'}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Description */}
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="text-sm font-semibold text-brand-heading dark:text-white mb-2">
+                    Description
+                  </h4>
+                  <p className="text-sm text-brand-paragraph dark:text-gray-300 whitespace-pre-line leading-relaxed">
+                    {selectedCheckpoint.Description || 'No description available.'}
+                  </p>
+                </div>
+                
+                {/* Source Link */}
+                {selectedCheckpoint.Source && (
+                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <a
+                      href={selectedCheckpoint.Source}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-brand-orange hover:underline font-medium"
+                    >
+                      View Original Source →
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                onClick={() => setSelectedCheckpoint(null)}
+                className="w-full bg-brand-blue-grey hover:bg-brand-blue-grey/90"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
