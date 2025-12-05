@@ -13,6 +13,12 @@ export default {
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        brand: {
+          orange: "#E86C2C",
+          "blue-grey": "#2C3E50",
+          heading: "#1a202c",
+          paragraph: "#4a5568",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
