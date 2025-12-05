@@ -2,6 +2,18 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import type { Checkpoint, CheckpointResponse, CheckpointError } from "@/lib/types/checkpoint";
 
+// CORS headers for embed script access
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+// Handle OPTIONS request for CORS preflight
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * GET /api/dui-checkpoints
  *
@@ -57,7 +69,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<Checkpoint
       console.error("Supabase error:", error);
       return NextResponse.json(
         { error: "Failed to fetch checkpoints", details: error.message },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -65,12 +77,12 @@ export async function GET(request: NextRequest): Promise<NextResponse<Checkpoint
       success: true,
       count: data?.length ?? 0,
       checkpoints: data as Checkpoint[],
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
