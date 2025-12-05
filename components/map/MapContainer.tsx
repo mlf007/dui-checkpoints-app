@@ -20,6 +20,33 @@ interface MapContainerProps {
   center: [number, number]
   zoom: number
   onMarkerClick: (checkpoint: Checkpoint) => void
+  onViewDetails: (checkpoint: Checkpoint) => void
+}
+
+// County colors for markers
+const countyColors: Record<string, string> = {
+  'Imperial': '#DC2626',
+  'L.A': '#E86C2C',
+  'L.A ': '#E86C2C',
+  'LA': '#F59E0B',
+  'Alameda': '#059669',
+  'Alameda ': '#059669',
+  'Placer County': '#7C3AED',
+  'San diego': '#2563EB',
+  'Riverside': '#EC4899',
+  'Monterey': '#0891B2',
+  'Solono': '#CA8A04',
+  'Fresno County': '#BE185D',
+}
+
+// Default color for unknown counties
+const defaultColor = '#6B7280'
+
+// Get color for a county
+function getCountyColor(county: string | null): string {
+  if (!county) return defaultColor
+  const trimmed = county.trim()
+  return countyColors[trimmed] || countyColors[county] || defaultColor
 }
 
 // Custom marker icons
@@ -29,22 +56,22 @@ const createCustomIcon = (color: string, isSelected: boolean = false, isToday: b
   return L.divIcon({
     className: 'custom-marker',
     html: `
-      <div class="marker-wrapper ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}" style="
+      <div class="marker-wrapper ${isSelected ? 'selected' : ''}" style="
         width: ${size}px;
         height: ${size}px;
         position: relative;
       ">
         <svg viewBox="0 0 24 24" width="${size}" height="${size}" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));">
-          <path fill="${color}" stroke="white" stroke-width="1" d="M12 0C7.58 0 4 3.58 4 8c0 5.25 8 13 8 13s8-7.75 8-13c0-4.42-3.58-8-8-8z"/>
-          <circle cx="12" cy="8" r="4" fill="white"/>
+          <path fill="${color}" stroke="white" stroke-width="1.5" d="M12 0C7.58 0 4 3.58 4 8c0 5.25 8 13 8 13s8-7.75 8-13c0-4.42-3.58-8-8-8z"/>
+          <circle cx="12" cy="8" r="3.5" fill="white"/>
         </svg>
-        ${isToday ? '<div class="today-pulse"></div>' : ''}
+        ${isToday ? '<div class="today-badge">!</div>' : ''}
         ${isSelected ? '<div class="selected-ring"></div>' : ''}
       </div>
     `,
     iconSize: [size, size],
     iconAnchor: [size / 2, size],
-    popupAnchor: [0, -size],
+    popupAnchor: [0, -size + 5],
   })
 }
 
@@ -61,22 +88,7 @@ const userLocationIcon = L.divIcon({
   iconAnchor: [12, 12],
 })
 
-// County/Area bounds for California (approximate)
-const countyBounds: Record<string, { bounds: L.LatLngBoundsExpression; color: string }> = {
-  'Imperial': { bounds: [[32.5, -116.2], [33.2, -114.4]], color: '#DC2626' },
-  'L.A': { bounds: [[33.6, -118.9], [34.5, -117.4]], color: '#E86C2C' },
-  'LA': { bounds: [[33.6, -118.9], [34.5, -117.4]], color: '#E86C2C' },
-  'Alameda': { bounds: [[37.4, -122.5], [37.95, -121.4]], color: '#059669' },
-  'Alameda ': { bounds: [[37.4, -122.5], [37.95, -121.4]], color: '#059669' },
-  'Placer County': { bounds: [[38.7, -121.6], [39.4, -119.8]], color: '#7C3AED' },
-  'San diego': { bounds: [[32.4, -117.7], [33.6, -115.8]], color: '#2563EB' },
-  'Riverside': { bounds: [[33.3, -117.8], [34.2, -114.2]], color: '#DC2626' },
-  'Monterey': { bounds: [[35.7, -122.1], [37.0, -120.0]], color: '#0891B2' },
-  'Solono': { bounds: [[37.9, -122.5], [38.7, -121.4]], color: '#CA8A04' },
-  'Fresno County': { bounds: [[35.8, -121.0], [37.6, -118.2]], color: '#BE185D' },
-}
-
-// City coordinates (fixed, no randomization)
+// City coordinates (fixed)
 const cityCoords: Record<string, [number, number]> = {
   'El Centro': [32.792, -115.563],
   'Glendora': [34.136, -117.865],
@@ -121,8 +133,34 @@ function getCoordinates(checkpoint: Checkpoint): [number, number] | null {
     return countyCoords[county]
   }
 
-  // Default to California center
   return [36.7783, -119.4179]
+}
+
+// Fetch city boundary from Nominatim (OpenStreetMap)
+async function fetchCityBoundary(cityName: string, state: string = 'California'): Promise<any | null> {
+  try {
+    const query = `${cityName}, ${state}, USA`
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&polygon_geojson=1&limit=1`
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'DUI-Checkpoint-Map/1.0'
+      }
+    })
+    
+    if (!response.ok) return null
+    
+    const data = await response.json()
+    
+    if (data && data.length > 0 && data[0].geojson) {
+      return data[0].geojson
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error fetching city boundary:', error)
+    return null
+  }
 }
 
 export default function MapContainer({
@@ -132,16 +170,22 @@ export default function MapContainer({
   center,
   zoom,
   onMarkerClick,
+  onViewDetails,
 }: MapContainerProps) {
   const mapRef = useRef<L.Map | null>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
   const userMarkerRef = useRef<L.Marker | null>(null)
-  const areaLayerRef = useRef<L.Rectangle | null>(null)
+  const boundaryLayerRef = useRef<L.GeoJSON | null>(null)
   const styleRef = useRef<HTMLStyleElement | null>(null)
   const initializedRef = useRef(false)
+  const viewDetailsRef = useRef(onViewDetails)
+  const boundaryCache = useRef<Map<string, any>>(new Map())
 
-  // Check if checkpoint is today
+  useEffect(() => {
+    viewDetailsRef.current = onViewDetails
+  }, [onViewDetails])
+
   const isToday = useCallback((dateString: string | null) => {
     if (!dateString) return false
     const checkpointDate = new Date(dateString)
@@ -149,28 +193,11 @@ export default function MapContainer({
     return checkpointDate.toDateString() === today.toDateString()
   }, [])
 
-  // Check if checkpoint is upcoming
-  const isUpcoming = useCallback((dateString: string | null) => {
-    if (!dateString) return false
-    const checkpointDate = new Date(dateString)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return checkpointDate >= today
-  }, [])
-
-  // Get marker color based on checkpoint status
-  const getMarkerColor = useCallback((checkpoint: Checkpoint) => {
-    if (isToday(checkpoint.Date)) return '#DC2626' // Red for today
-    if (isUpcoming(checkpoint.Date)) return '#E86C2C' // Orange for upcoming
-    return '#6B7280' // Gray for past
-  }, [isToday, isUpcoming])
-
-  // Initialize map only once
+  // Initialize map
   useEffect(() => {
     if (!mapContainerRef.current || initializedRef.current) return
     initializedRef.current = true
 
-    // Add custom styles
     const style = document.createElement('style')
     style.textContent = `
       .custom-marker {
@@ -179,44 +206,52 @@ export default function MapContainer({
       }
       .marker-wrapper {
         transition: transform 0.2s ease;
+        cursor: pointer;
       }
       .marker-wrapper:hover {
-        transform: scale(1.1);
+        transform: scale(1.15);
       }
       .marker-wrapper.selected {
-        transform: scale(1.2);
+        transform: scale(1.25);
         z-index: 1000 !important;
       }
-      .today-pulse {
+      .today-badge {
         position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -70%);
-        width: 60px;
-        height: 60px;
+        top: -4px;
+        right: -4px;
+        width: 18px;
+        height: 18px;
+        background: #DC2626;
+        color: white;
         border-radius: 50%;
-        background: rgba(220, 38, 38, 0.3);
-        animation: pulse-today 2s ease-out infinite;
+        font-size: 12px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        animation: pulse-badge 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse-badge {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
       }
       .selected-ring {
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -70%);
-        width: 50px;
-        height: 50px;
-        border: 3px solid #E86C2C;
+        width: 55px;
+        height: 55px;
+        border: 3px solid currentColor;
         border-radius: 50%;
         animation: pulse-selected 1.5s ease-out infinite;
-      }
-      @keyframes pulse-today {
-        0% { transform: translate(-50%, -70%) scale(0.5); opacity: 1; }
-        100% { transform: translate(-50%, -70%) scale(2); opacity: 0; }
+        pointer-events: none;
       }
       @keyframes pulse-selected {
         0% { transform: translate(-50%, -70%) scale(0.8); opacity: 1; }
-        50% { transform: translate(-50%, -70%) scale(1.2); opacity: 0.5; }
-        100% { transform: translate(-50%, -70%) scale(0.8); opacity: 1; }
+        100% { transform: translate(-50%, -70%) scale(1.5); opacity: 0; }
       }
       .user-marker {
         position: relative;
@@ -255,43 +290,73 @@ export default function MapContainer({
         border-radius: 12px;
         padding: 0;
         overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
       }
       .leaflet-popup-content {
         margin: 0;
-        min-width: 180px;
+        min-width: 200px;
       }
       .leaflet-popup-tip {
         background: white;
       }
-      .county-overlay {
-        transition: all 0.3s ease;
+      .popup-content {
+        padding: 16px;
       }
-      @keyframes pulse-overlay {
+      .popup-title {
+        font-weight: 700;
+        font-size: 16px;
+        color: #1a202c;
+        margin-bottom: 4px;
+      }
+      .popup-county {
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      .popup-date {
+        font-size: 13px;
+        color: #4a5568;
+        margin-bottom: 12px;
+      }
+      .popup-btn {
+        width: 100%;
+        padding: 10px 16px;
+        background: #E86C2C;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .popup-btn:hover {
+        background: #d55a1a;
+      }
+      .city-boundary {
+        animation: pulse-boundary 3s ease-in-out infinite;
+      }
+      @keyframes pulse-boundary {
         0%, 100% { 
-          opacity: 1;
-          stroke-width: 4;
+          opacity: 0.7;
+          stroke-width: 3;
         }
         50% { 
-          opacity: 0.6;
-          stroke-width: 6;
+          opacity: 0.4;
+          stroke-width: 4;
         }
       }
     `
     document.head.appendChild(style)
     styleRef.current = style
 
-    // Create map
     const map = L.map(mapContainerRef.current, {
       center: center,
       zoom: zoom,
       zoomControl: false,
     })
 
-    // Add zoom control to bottom right
     L.control.zoom({ position: 'bottomright' }).addTo(map)
 
-    // Add tile layer
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19,
@@ -310,13 +375,12 @@ export default function MapContainer({
     }
   }, [center, zoom])
 
-  // Update markers when checkpoints change
+  // Update markers
   useEffect(() => {
     if (!mapRef.current) return
 
     const currentMarkerIds = new Set<string>()
 
-    // Add/update checkpoint markers
     checkpoints.forEach((checkpoint) => {
       const coords = getCoordinates(checkpoint)
       if (!coords) return
@@ -324,36 +388,39 @@ export default function MapContainer({
       currentMarkerIds.add(checkpoint.id)
       const isSelected = selectedCheckpoint?.id === checkpoint.id
       const isTodayCheckpoint = isToday(checkpoint.Date)
-      const color = getMarkerColor(checkpoint)
+      const color = getCountyColor(checkpoint.County)
       const icon = createCustomIcon(color, isSelected, isTodayCheckpoint)
 
       let marker = markersRef.current.get(checkpoint.id)
 
       if (marker) {
-        // Update existing marker icon only
         marker.setIcon(icon)
       } else {
-        // Create new marker
         marker = L.marker(coords, { icon })
           .addTo(mapRef.current!)
 
-        // Add popup
-        const popupContent = `
-          <div style="padding: 12px;">
-            <div style="font-weight: 600; font-size: 14px; color: #1a202c; margin-bottom: 4px;">
-              ${checkpoint.City || 'Unknown City'}
-            </div>
-            <div style="font-size: 12px; color: #E86C2C; margin-bottom: 8px;">
-              ${checkpoint.County || ''}
-            </div>
-            <div style="font-size: 12px; color: #4a5568;">
-              ${checkpoint.Date ? new Date(checkpoint.Date).toLocaleDateString() : 'Date TBD'}
-            </div>
-          </div>
+        const popupContent = document.createElement('div')
+        popupContent.className = 'popup-content'
+        popupContent.innerHTML = `
+          <div class="popup-title">${checkpoint.City || 'Unknown City'}</div>
+          <div class="popup-county" style="color: ${color}">${checkpoint.County || ''}</div>
+          <div class="popup-date">${checkpoint.Date ? new Date(checkpoint.Date).toLocaleDateString() : 'Date TBD'}</div>
         `
-        marker.bindPopup(popupContent)
+        
+        const btn = document.createElement('button')
+        btn.className = 'popup-btn'
+        btn.textContent = 'View Details'
+        btn.onclick = (e) => {
+          e.stopPropagation()
+          viewDetailsRef.current(checkpoint)
+        }
+        popupContent.appendChild(btn)
 
-        // Handle click
+        marker.bindPopup(popupContent, {
+          closeButton: true,
+          className: 'custom-popup'
+        })
+
         marker.on('click', () => {
           onMarkerClick(checkpoint)
         })
@@ -362,63 +429,130 @@ export default function MapContainer({
       }
     })
 
-    // Remove markers that are no longer in checkpoints
     markersRef.current.forEach((marker, id) => {
       if (!currentMarkerIds.has(id)) {
         marker.remove()
         markersRef.current.delete(id)
       }
     })
-  }, [checkpoints, selectedCheckpoint, onMarkerClick, getMarkerColor, isToday])
+  }, [checkpoints, selectedCheckpoint, onMarkerClick, isToday])
 
-  // Update area overlay for selected checkpoint
+  // Update boundary overlay for selected checkpoint - ACTUAL CITY BOUNDARY
   useEffect(() => {
     if (!mapRef.current) return
 
-    // Remove existing area overlay
-    if (areaLayerRef.current) {
-      areaLayerRef.current.remove()
-      areaLayerRef.current = null
+    // Remove existing boundary
+    if (boundaryLayerRef.current) {
+      boundaryLayerRef.current.remove()
+      boundaryLayerRef.current = null
     }
 
-    // Add area overlay for selected checkpoint
-    if (selectedCheckpoint) {
-      const county = selectedCheckpoint.County?.trim()
-      if (county && countyBounds[county]) {
-        const { bounds, color } = countyBounds[county]
-        
-        // Create a styled rectangle overlay
-        const rectangle = L.rectangle(bounds, {
+    if (!selectedCheckpoint) return
+
+    const cityName = selectedCheckpoint.City?.trim()
+    const color = getCountyColor(selectedCheckpoint.County)
+    const coords = getCoordinates(selectedCheckpoint)
+
+    // Function to add boundary to map
+    const addBoundary = (geojson: any) => {
+      if (!mapRef.current) return
+
+      const boundaryLayer = L.geoJSON(geojson, {
+        style: {
           color: color,
-          weight: 4,
+          weight: 3,
           fillColor: color,
-          fillOpacity: 0.18,
-          dashArray: '10, 6',
-          className: 'county-overlay',
-        }).addTo(mapRef.current)
-
-        // Add a pulsing effect class
-        const element = rectangle.getElement()
-        if (element) {
-          element.style.animation = 'pulse-overlay 2s ease-in-out infinite'
+          fillOpacity: 0.15,
+          dashArray: '5, 5',
+          className: 'city-boundary'
         }
-        
-        areaLayerRef.current = rectangle
+      }).addTo(mapRef.current)
 
-        // Fit map to show the entire county area
+      boundaryLayerRef.current = boundaryLayer
+
+      // Fit map to boundary
+      const bounds = boundaryLayer.getBounds()
+      if (bounds.isValid()) {
         mapRef.current.fitBounds(bounds, { 
           padding: [50, 50],
-          maxZoom: 9,
+          maxZoom: 13,
           animate: true 
         })
-      } else {
-        // No county bounds, just pan to the checkpoint
-        const coords = getCoordinates(selectedCheckpoint)
-        if (coords) {
-          mapRef.current.setView(coords, 11, { animate: true })
-        }
       }
     }
+
+    // Try to get boundary
+    const loadBoundary = async () => {
+      if (!cityName || cityName === 'Unknown City') {
+        // No city name, use circle fallback
+        if (coords && mapRef.current) {
+          const circle = L.circle(coords, {
+            radius: 5000,
+            color: color,
+            weight: 3,
+            fillColor: color,
+            fillOpacity: 0.15,
+            dashArray: '8, 6',
+          }).addTo(mapRef.current)
+          
+          boundaryLayerRef.current = circle as any
+          mapRef.current.setView(coords, 12, { animate: true })
+        }
+        return
+      }
+
+      // Check cache first
+      const cacheKey = `${cityName}-California`
+      if (boundaryCache.current.has(cacheKey)) {
+        const cachedData = boundaryCache.current.get(cacheKey)
+        if (cachedData) {
+          addBoundary(cachedData)
+        } else if (coords && mapRef.current) {
+          // Cache says no boundary, use circle
+          const circle = L.circle(coords, {
+            radius: 5000,
+            color: color,
+            weight: 3,
+            fillColor: color,
+            fillOpacity: 0.15,
+            dashArray: '8, 6',
+          }).addTo(mapRef.current)
+          boundaryLayerRef.current = circle as any
+          mapRef.current.setView(coords, 12, { animate: true })
+        }
+        return
+      }
+
+      // Fetch from Nominatim
+      const geojson = await fetchCityBoundary(cityName)
+      
+      // Cache the result (even if null)
+      boundaryCache.current.set(cacheKey, geojson)
+      
+      if (geojson) {
+        addBoundary(geojson)
+      } else if (coords && mapRef.current) {
+        // Fallback to circle if no boundary found
+        const circle = L.circle(coords, {
+          radius: 5000,
+          color: color,
+          weight: 3,
+          fillColor: color,
+          fillOpacity: 0.15,
+          dashArray: '8, 6',
+        }).addTo(mapRef.current)
+        boundaryLayerRef.current = circle as any
+        mapRef.current.setView(coords, 12, { animate: true })
+      }
+
+      // Open popup
+      const marker = markersRef.current.get(selectedCheckpoint.id)
+      if (marker) {
+        marker.openPopup()
+      }
+    }
+
+    loadBoundary()
   }, [selectedCheckpoint])
 
   // Update user location marker
@@ -438,7 +572,6 @@ export default function MapContainer({
         .addTo(mapRef.current)
         .bindPopup('<div style="padding: 8px; text-align: center; font-weight: 600;">📍 You are here</div>')
       
-      // Pan to user location
       mapRef.current.setView(userLocation, 10, { animate: true })
     }
   }, [userLocation])

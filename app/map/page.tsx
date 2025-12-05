@@ -4,23 +4,20 @@ import dynamic from 'next/dynamic'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
 import { 
   Search, 
   MapPin, 
   Calendar, 
   Clock, 
   Phone, 
-  Navigation, 
   X, 
   ChevronUp, 
   ChevronDown,
   Locate,
-  Filter,
   List,
-  Map as MapIcon,
   AlertCircle,
-  Shield
+  Shield,
+  Menu
 } from 'lucide-react'
 import type { Checkpoint } from '@/lib/types/checkpoint'
 
@@ -45,13 +42,14 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null)
+  const [detailCheckpoint, setDetailCheckpoint] = useState<Checkpoint | null>(null)
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
   const [isLocating, setIsLocating] = useState(false)
-  const [showSidebar, setShowSidebar] = useState(true)
+  const [showDrawer, setShowDrawer] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [mapCenter, setMapCenter] = useState<[number, number]>([36.7783, -119.4179]) // California center
-  const [mapZoom, setMapZoom] = useState(6)
-  const [showUpcomingOnly, setShowUpcomingOnly] = useState(true)
+  const [mapCenter] = useState<[number, number]>([36.7783, -119.4179])
+  const [mapZoom] = useState(6)
+  const [filterMode, setFilterMode] = useState<'upcoming' | 'all'>('upcoming')
 
   // Detect mobile
   useEffect(() => {
@@ -84,27 +82,35 @@ export default function MapPage() {
 
   // Filter checkpoints
   const filteredCheckpoints = useMemo(() => {
-    return checkpoints.filter(cp => {
-      // Upcoming filter
-      if (showUpcomingOnly) {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const cpDate = cp.Date ? new Date(cp.Date) : null
-        if (!cpDate || cpDate < today) return false
-      }
+    let filtered = checkpoints
 
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        return (
-          cp.City?.toLowerCase().includes(query) ||
-          cp.County?.toLowerCase().includes(query) ||
-          cp.Location?.toLowerCase().includes(query)
-        )
-      }
-      return true
+    // Apply upcoming/all filter
+    if (filterMode === 'upcoming') {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      filtered = filtered.filter(cp => {
+        const cpDate = cp.Date ? new Date(cp.Date) : null
+        return cpDate && cpDate >= today
+      })
+    }
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(cp => 
+        cp.City?.toLowerCase().includes(query) ||
+        cp.County?.toLowerCase().includes(query) ||
+        cp.Location?.toLowerCase().includes(query)
+      )
+    }
+
+    // Sort by date
+    return filtered.sort((a, b) => {
+      const dateA = a.Date ? new Date(a.Date).getTime() : 0
+      const dateB = b.Date ? new Date(b.Date).getTime() : 0
+      return dateA - dateB
     })
-  }, [checkpoints, searchQuery, showUpcomingOnly])
+  }, [checkpoints, searchQuery, filterMode])
 
   // Get user location
   const getUserLocation = useCallback(() => {
@@ -118,8 +124,6 @@ export default function MapPage() {
       (position) => {
         const { latitude, longitude } = position.coords
         setUserLocation([latitude, longitude])
-        setMapCenter([latitude, longitude])
-        setMapZoom(10)
         setIsLocating(false)
       },
       (error) => {
@@ -131,6 +135,14 @@ export default function MapPage() {
     )
   }, [])
 
+  // Check if checkpoint is today
+  const isToday = (dateString: string | null) => {
+    if (!dateString) return false
+    const checkpointDate = new Date(dateString)
+    const today = new Date()
+    return checkpointDate.toDateString() === today.toDateString()
+  }
+
   // Check if checkpoint is upcoming
   const isUpcoming = (dateString: string | null) => {
     if (!dateString) return false
@@ -138,14 +150,6 @@ export default function MapPage() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return checkpointDate >= today
-  }
-
-  // Check if checkpoint is today
-  const isToday = (dateString: string | null) => {
-    if (!dateString) return false
-    const checkpointDate = new Date(dateString)
-    const today = new Date()
-    return checkpointDate.toDateString() === today.toDateString()
   }
 
   // Format date
@@ -159,18 +163,172 @@ export default function MapPage() {
     })
   }
 
-  // Handle checkpoint selection
+  // County colors
+  const countyColors: Record<string, string> = {
+    'Imperial': '#DC2626',
+    'L.A': '#E86C2C',
+    'LA': '#F59E0B',
+    'Alameda': '#059669',
+    'Placer County': '#7C3AED',
+    'San diego': '#2563EB',
+    'Riverside': '#EC4899',
+    'Monterey': '#0891B2',
+    'Solono': '#CA8A04',
+    'Fresno County': '#BE185D',
+  }
+
+  const getCountyColor = (county: string | null) => {
+    if (!county) return '#6B7280'
+    return countyColors[county.trim()] || '#6B7280'
+  }
+
+  // Handle checkpoint selection (from list) - just highlight on map
   const handleCheckpointSelect = (checkpoint: Checkpoint) => {
     setSelectedCheckpoint(checkpoint)
     if (isMobile) {
-      setShowSidebar(false)
+      setShowDrawer(false)
     }
   }
 
-  // Handle marker click from map
+  // Handle marker click from map - show overlay
   const handleMarkerClick = (checkpoint: Checkpoint) => {
     setSelectedCheckpoint(checkpoint)
   }
+
+  // Handle view details - open modal
+  const handleViewDetails = useCallback((checkpoint: Checkpoint) => {
+    setDetailCheckpoint(checkpoint)
+  }, [])
+
+  // Sidebar/Drawer Content
+  const CheckpointList = () => (
+    <>
+      {/* Search & Filters */}
+      <div className="p-4 border-b border-gray-100 flex-shrink-0 bg-white">
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search city, county..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFilterMode('upcoming')}
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+              filterMode === 'upcoming' 
+                ? 'bg-brand-orange text-white shadow-md' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Upcoming
+          </button>
+          <button
+            onClick={() => setFilterMode('all')}
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+              filterMode === 'all' 
+                ? 'bg-brand-blue-grey text-white shadow-md' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            All
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-500 mt-2 text-center">
+          {filteredCheckpoints.length} checkpoint{filteredCheckpoints.length !== 1 ? 's' : ''} found
+        </p>
+      </div>
+
+      {/* Checkpoint List */}
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-orange mx-auto"></div>
+            <p className="mt-2 text-sm text-brand-paragraph">Loading...</p>
+          </div>
+        ) : filteredCheckpoints.length === 0 ? (
+          <div className="p-8 text-center">
+            <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-brand-paragraph">No checkpoints found</p>
+            <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {filteredCheckpoints.map((checkpoint) => (
+              <button
+                key={checkpoint.id}
+                onClick={() => handleCheckpointSelect(checkpoint)}
+                className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${
+                  selectedCheckpoint?.id === checkpoint.id 
+                    ? 'bg-orange-50 border-l-4' 
+                    : 'border-l-4 border-transparent'
+                }`}
+                style={{ 
+                  borderLeftColor: selectedCheckpoint?.id === checkpoint.id 
+                    ? getCountyColor(checkpoint.County) 
+                    : 'transparent' 
+                }}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h3 className="font-semibold text-brand-heading">
+                      {checkpoint.City || 'Unknown City'}
+                    </h3>
+                    <p className="text-sm font-medium" style={{ color: getCountyColor(checkpoint.County) }}>
+                      {checkpoint.County}
+                    </p>
+                  </div>
+                  {isToday(checkpoint.Date) ? (
+                    <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full animate-pulse">
+                      TODAY
+                    </span>
+                  ) : isUpcoming(checkpoint.Date) ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                      Upcoming
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs font-medium rounded-full">
+                      Past
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-4 text-sm text-brand-paragraph">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatDate(checkpoint.Date)}
+                  </span>
+                  <span className="flex items-center gap-1 truncate">
+                    <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="truncate">{checkpoint.Time || 'TBD'}</span>
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* CTA Footer */}
+      <div className="p-4 border-t border-gray-100 bg-gradient-to-r from-brand-blue-grey to-brand-blue-grey/90 flex-shrink-0">
+        <div className="text-white mb-2">
+          <p className="font-semibold text-sm">Got stopped at a checkpoint?</p>
+          <p className="text-xs text-gray-300">The Meehan Law Firm is here to help 24/7</p>
+        </div>
+        <a 
+          href="tel:+1234567890"
+          className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
+        >
+          <Phone className="h-5 w-5" />
+          Call Now - Free Consultation
+        </a>
+      </div>
+    </>
+  )
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -178,6 +336,16 @@ export default function MapPage() {
       <header className="bg-brand-blue-grey text-white py-3 px-4 shadow-lg z-50 flex-shrink-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {/* Mobile Menu Button */}
+            {isMobile && (
+              <button
+                onClick={() => setShowDrawer(true)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+            )}
+            
             <Shield className="h-8 w-8 text-brand-orange" />
             <div>
               <h1 className="text-lg md:text-xl font-bold">DUI Checkpoint Map</h1>
@@ -210,139 +378,48 @@ export default function MapPage() {
 
       {/* Main Content */}
       <div className="flex-1 flex relative overflow-hidden">
-        {/* Sidebar */}
-        <div 
-          className={`
-            ${isMobile 
-              ? `absolute bottom-0 left-0 right-0 z-40 transition-transform duration-300 ${showSidebar ? 'translate-y-0' : 'translate-y-[calc(100%-60px)]'}` 
-              : 'w-96 flex-shrink-0'
-            }
-            bg-white shadow-xl flex flex-col
-            ${isMobile ? 'rounded-t-2xl max-h-[70vh]' : 'h-full'}
-          `}
-        >
-          {/* Mobile Handle */}
-          {isMobile && (
-            <button 
-              onClick={() => setShowSidebar(!showSidebar)}
-              className="w-full py-3 flex flex-col items-center border-b border-gray-100"
-            >
-              <div className="w-10 h-1 bg-gray-300 rounded-full mb-2" />
-              <div className="flex items-center gap-2 text-sm text-brand-paragraph">
-                {showSidebar ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                {filteredCheckpoints.length} checkpoints found
-              </div>
-            </button>
-          )}
+        {/* Desktop Sidebar */}
+        {!isMobile && (
+          <div className="w-96 flex-shrink-0 bg-white shadow-xl flex flex-col h-full">
+            <CheckpointList />
+          </div>
+        )}
 
-          {/* Search & Filters */}
-          <div className="p-4 border-b border-gray-100 flex-shrink-0">
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search city, county..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+        {/* Mobile Drawer */}
+        {isMobile && (
+          <>
+            {/* Backdrop */}
+            {showDrawer && (
+              <div 
+                className="fixed inset-0 bg-black/50 z-40"
+                onClick={() => setShowDrawer(false)}
               />
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button
-                variant={showUpcomingOnly ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setShowUpcomingOnly(true)}
-                className={showUpcomingOnly ? 'bg-brand-orange hover:bg-brand-orange/90' : ''}
-              >
-                Upcoming
-              </Button>
-              <Button
-                variant={!showUpcomingOnly ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setShowUpcomingOnly(false)}
-                className={!showUpcomingOnly ? 'bg-brand-blue-grey hover:bg-brand-blue-grey/90' : ''}
-              >
-                All
-              </Button>
-            </div>
-          </div>
-
-          {/* Checkpoint List */}
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-orange mx-auto"></div>
-                <p className="mt-2 text-sm text-brand-paragraph">Loading...</p>
-              </div>
-            ) : filteredCheckpoints.length === 0 ? (
-              <div className="p-8 text-center">
-                <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-brand-paragraph">No checkpoints found</p>
-                <p className="text-sm text-gray-400 mt-1">Try adjusting your search</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {filteredCheckpoints.map((checkpoint) => (
-                  <button
-                    key={checkpoint.id}
-                    onClick={() => handleCheckpointSelect(checkpoint)}
-                    className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${
-                      selectedCheckpoint?.id === checkpoint.id ? 'bg-orange-50 border-l-4 border-brand-orange' : ''
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold text-brand-heading">
-                          {checkpoint.City || 'Unknown City'}
-                        </h3>
-                        <p className="text-sm text-brand-orange">{checkpoint.County}</p>
-                      </div>
-                      {isToday(checkpoint.Date) ? (
-                        <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full animate-pulse">
-                          TODAY
-                        </span>
-                      ) : isUpcoming(checkpoint.Date) ? (
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                          Upcoming
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
-                          Past
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-4 text-sm text-brand-paragraph">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {formatDate(checkpoint.Date)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        {checkpoint.Time || 'TBD'}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
             )}
-          </div>
-
-          {/* CTA Footer */}
-          <div className="p-4 border-t border-gray-100 bg-gradient-to-r from-brand-blue-grey to-brand-blue-grey/90 flex-shrink-0">
-            <div className="text-white mb-3">
-              <p className="font-semibold text-sm">Got stopped at a checkpoint?</p>
-              <p className="text-xs text-gray-300">The Meehan Law Firm is here to help 24/7</p>
-            </div>
-            <a 
-              href="tel:+1234567890"
-              className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
+            
+            {/* Drawer */}
+            <div 
+              className={`fixed inset-y-0 left-0 w-[85%] max-w-sm bg-white z-50 transform transition-transform duration-300 flex flex-col ${
+                showDrawer ? 'translate-x-0' : '-translate-x-full'
+              }`}
             >
-              <Phone className="h-5 w-5" />
-              Call Now - Free Consultation
-            </a>
-          </div>
-        </div>
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between p-4 border-b bg-brand-blue-grey text-white">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-6 w-6 text-brand-orange" />
+                  <span className="font-bold">Checkpoints</span>
+                </div>
+                <button 
+                  onClick={() => setShowDrawer(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <CheckpointList />
+            </div>
+          </>
+        )}
 
         {/* Map Container */}
         <div className="flex-1 relative">
@@ -353,37 +430,40 @@ export default function MapPage() {
             center={mapCenter}
             zoom={mapZoom}
             onMarkerClick={handleMarkerClick}
+            onViewDetails={handleViewDetails}
           />
 
-          {/* Mobile Toggle Button */}
-          {isMobile && !showSidebar && (
-            <Button
-              onClick={() => setShowSidebar(true)}
-              className="absolute bottom-20 left-4 bg-white text-brand-heading shadow-lg"
-              size="sm"
+          {/* Mobile: Show List Button */}
+          {isMobile && (
+            <button
+              onClick={() => setShowDrawer(true)}
+              className="absolute bottom-6 left-4 bg-white text-brand-heading shadow-lg px-4 py-3 rounded-full flex items-center gap-2 font-medium"
             >
-              <List className="h-4 w-4 mr-1" />
+              <List className="h-5 w-5" />
               {filteredCheckpoints.length} Checkpoints
-            </Button>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Selected Checkpoint Detail Modal */}
-      {selectedCheckpoint && (
+      {/* Detail Modal - Only opens from View Details button */}
+      {detailCheckpoint && (
         <div 
           className="fixed inset-0 flex items-end md:items-center justify-center"
           style={{ zIndex: 10000 }}
-          onClick={() => setSelectedCheckpoint(null)}
+          onClick={() => setDetailCheckpoint(null)}
         >
           <div className="absolute inset-0 bg-black/50" />
           
           <div 
-            className="relative bg-white w-full md:max-w-lg md:mx-4 md:rounded-xl rounded-t-2xl max-h-[80vh] overflow-hidden animate-in slide-in-from-bottom duration-300"
+            className="relative bg-white w-full md:max-w-lg md:mx-4 md:rounded-xl rounded-t-2xl max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Color bar based on status */}
-            <div className={`h-2 ${isToday(selectedCheckpoint.Date) ? 'bg-red-500' : isUpcoming(selectedCheckpoint.Date) ? 'bg-brand-orange' : 'bg-gray-300'}`} />
+            {/* Color bar based on county */}
+            <div 
+              className="h-2" 
+              style={{ backgroundColor: getCountyColor(detailCheckpoint.County) }}
+            />
             
             {/* Handle */}
             <div className="md:hidden flex justify-center pt-3">
@@ -395,18 +475,23 @@ export default function MapPage() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-xl font-bold text-brand-heading">
-                    {selectedCheckpoint.City || 'Unknown City'}
+                    {detailCheckpoint.City || 'Unknown City'}
                   </h3>
-                  {isToday(selectedCheckpoint.Date) && (
+                  {isToday(detailCheckpoint.Date) && (
                     <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded-full animate-pulse">
                       TODAY
                     </span>
                   )}
                 </div>
-                <p className="text-brand-orange font-medium">{selectedCheckpoint.County}</p>
+                <p 
+                  className="font-medium"
+                  style={{ color: getCountyColor(detailCheckpoint.County) }}
+                >
+                  {detailCheckpoint.County}
+                </p>
               </div>
               <button
-                onClick={() => setSelectedCheckpoint(null)}
+                onClick={() => setDetailCheckpoint(null)}
                 className="p-2 hover:bg-gray-100 rounded-full"
               >
                 <X className="h-5 w-5" />
@@ -414,36 +499,36 @@ export default function MapPage() {
             </div>
 
             {/* Content */}
-            <div className="p-4 space-y-4 overflow-y-auto max-h-[40vh]">
+            <div className="p-4 space-y-4 overflow-y-auto max-h-[45vh]">
               <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-brand-orange mt-0.5" />
+                <MapPin className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: getCountyColor(detailCheckpoint.County) }} />
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Location</p>
-                  <p className="text-brand-heading">{selectedCheckpoint.Location || 'Location not disclosed'}</p>
+                  <p className="text-brand-heading">{detailCheckpoint.Location || 'Location not disclosed'}</p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-brand-orange mt-0.5" />
+                <Calendar className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: getCountyColor(detailCheckpoint.County) }} />
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Date</p>
-                  <p className="text-brand-heading font-medium">{formatDate(selectedCheckpoint.Date)}</p>
+                  <p className="text-brand-heading font-medium">{formatDate(detailCheckpoint.Date)}</p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
-                <Clock className="h-5 w-5 text-brand-orange mt-0.5" />
+                <Clock className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: getCountyColor(detailCheckpoint.County) }} />
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Time</p>
-                  <p className="text-brand-heading">{selectedCheckpoint.Time || 'Time not specified'}</p>
+                  <p className="text-brand-heading">{detailCheckpoint.Time || 'Time not specified'}</p>
                 </div>
               </div>
 
-              {selectedCheckpoint.Description && (
+              {detailCheckpoint.Description && (
                 <div className="pt-4 border-t">
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Details</p>
                   <p className="text-sm text-brand-paragraph leading-relaxed">
-                    {selectedCheckpoint.Description}
+                    {detailCheckpoint.Description}
                   </p>
                 </div>
               )}
@@ -451,9 +536,9 @@ export default function MapPage() {
 
             {/* Actions */}
             <div className="p-4 border-t bg-gray-50 flex gap-3">
-              {selectedCheckpoint.Source && (
+              {detailCheckpoint.Source && (
                 <a
-                  href={selectedCheckpoint.Source}
+                  href={detailCheckpoint.Source}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 py-3 border border-gray-300 rounded-lg font-medium text-center text-brand-heading hover:bg-white transition-colors"
@@ -475,4 +560,3 @@ export default function MapPage() {
     </div>
   )
 }
-
