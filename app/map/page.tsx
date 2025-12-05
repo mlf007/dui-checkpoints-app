@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { 
   Search, 
@@ -11,15 +10,15 @@ import {
   Clock, 
   Phone, 
   X, 
-  ChevronUp, 
-  ChevronDown,
   Locate,
-  List,
   AlertCircle,
-  Shield,
-  Menu
+  Plus,
+  Navigation
 } from 'lucide-react'
 import type { Checkpoint } from '@/lib/types/checkpoint'
+
+// Logo URL
+const LOGO_URL = 'https://cdn.prod.website-files.com/668db2607224f56857ad5d85/66ac964485eaa20383644e2f_Group%20206.png'
 
 // Dynamically import map component to avoid SSR issues
 const MapContainer = dynamic(
@@ -208,7 +207,7 @@ export default function MapPage() {
     setDetailCheckpoint(checkpoint)
   }, [])
 
-  // Sidebar/Drawer Content
+  // Checkpoint List Component
   const CheckpointList = () => (
     <>
       {/* Search & Filters */}
@@ -340,47 +339,37 @@ export default function MapPage() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <header className="bg-brand-blue-grey text-white py-3 px-4 shadow-lg z-50 flex-shrink-0">
+      {/* Header - Desktop: Logo only, Mobile: Logo on primary bg */}
+      <header className="bg-brand-blue-grey py-3 px-4 shadow-lg z-50 flex-shrink-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Mobile Menu Button */}
-            {isMobile && (
-              <button
-                onClick={() => setShowDrawer(true)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <Menu className="h-6 w-6" />
-              </button>
-            )}
-            
-            <Shield className="h-8 w-8 text-brand-orange" />
-            <div>
-              <h1 className="text-lg md:text-xl font-bold">DUI Checkpoint Map</h1>
-              <p className="text-xs text-gray-300 hidden md:block">Find checkpoints near you</p>
-            </div>
-          </div>
+          {/* Logo */}
+          <img 
+            src={LOGO_URL} 
+            alt="Meehan Law Firm" 
+            className="h-10 md:h-12 w-auto"
+          />
           
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={getUserLocation}
-              disabled={isLocating}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-            >
-              <Locate className={`h-4 w-4 mr-1 ${isLocating ? 'animate-pulse' : ''}`} />
-              <span className="hidden sm:inline">{isLocating ? 'Locating...' : 'Find Me'}</span>
-            </Button>
-            
-            <a 
-              href="tel:+1234567890"
-              className="bg-brand-orange hover:bg-brand-orange/90 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors"
-            >
-              <Phone className="h-4 w-4" />
-              <span className="hidden sm:inline">Get Legal Help</span>
-            </a>
-          </div>
+          {/* Desktop Only - Right side buttons */}
+          {!isMobile && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={getUserLocation}
+                disabled={isLocating}
+                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+              >
+                <Locate className={`h-4 w-4 ${isLocating ? 'animate-pulse' : ''}`} />
+                {isLocating ? 'Locating...' : 'Find Me'}
+              </button>
+              
+              <a 
+                href="tel:+1234567890"
+                className="bg-brand-orange hover:bg-brand-orange/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+              >
+                <Phone className="h-4 w-4" />
+                Get Legal Help
+              </a>
+            </div>
+          )}
         </div>
       </header>
 
@@ -391,42 +380,6 @@ export default function MapPage() {
           <div className="w-96 flex-shrink-0 bg-white shadow-xl flex flex-col h-full">
             <CheckpointList />
           </div>
-        )}
-
-        {/* Mobile Drawer */}
-        {isMobile && (
-          <>
-            {/* Backdrop */}
-            {showDrawer && (
-              <div 
-                className="fixed inset-0 bg-black/50 z-40"
-                onClick={() => setShowDrawer(false)}
-              />
-            )}
-            
-            {/* Drawer */}
-            <div 
-              className={`fixed inset-y-0 left-0 w-[85%] max-w-sm bg-white z-50 transform transition-transform duration-300 flex flex-col ${
-                showDrawer ? 'translate-x-0' : '-translate-x-full'
-              }`}
-            >
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between p-4 border-b bg-brand-blue-grey text-white">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-6 w-6 text-brand-orange" />
-                  <span className="font-bold">Checkpoints</span>
-                </div>
-                <button 
-                  onClick={() => setShowDrawer(false)}
-                  className="p-2 hover:bg-white/10 rounded-lg"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              
-              <CheckpointList />
-            </div>
-          </>
         )}
 
         {/* Map Container */}
@@ -440,19 +393,93 @@ export default function MapPage() {
             onMarkerClick={handleMarkerClick}
             onViewDetails={handleViewDetails}
           />
-
-          {/* Mobile: Show List Button */}
-          {isMobile && (
-            <button
-              onClick={() => setShowDrawer(true)}
-              className="absolute bottom-6 left-4 bg-white text-brand-heading shadow-lg px-4 py-3 rounded-full flex items-center gap-2 font-medium"
-            >
-              <List className="h-5 w-5" />
-              {filteredCheckpoints.length} Checkpoints
-            </button>
-          )}
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation - iOS Style Floating */}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 pb-6 px-4 pt-2 bg-gradient-to-t from-white/90 to-transparent" style={{ zIndex: 9999 }}>
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 flex items-center justify-between px-3 py-2">
+            {/* Left - GPS Button */}
+            <button
+              onClick={getUserLocation}
+              disabled={isLocating}
+              className="flex flex-col items-center justify-center w-16 h-14 rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              <Navigation className={`h-6 w-6 text-brand-blue-grey ${isLocating ? 'animate-pulse' : ''}`} />
+              <span className="text-[10px] text-gray-600 mt-1">Locate</span>
+            </button>
+
+            {/* Center - Plus Button (Opens Drawer) */}
+            <button
+              onClick={() => setShowDrawer(true)}
+              className="relative -mt-10 flex items-center justify-center w-16 h-16 bg-brand-orange rounded-full shadow-xl hover:bg-brand-orange/90 transition-all active:scale-95 border-4 border-white"
+            >
+              <Plus className="h-8 w-8 text-white" />
+              {/* Badge */}
+              {filteredCheckpoints.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-md">
+                  {filteredCheckpoints.length > 99 ? '99+' : filteredCheckpoints.length}
+                </span>
+              )}
+            </button>
+
+            {/* Right - Call Button */}
+            <a
+              href="tel:+1234567890"
+              className="flex flex-col items-center justify-center w-16 h-14 rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              <Phone className="h-6 w-6 text-brand-orange" />
+              <span className="text-[10px] text-gray-600 mt-1">Call</span>
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Bottom Drawer */}
+      {isMobile && (
+        <>
+          {/* Backdrop */}
+          {showDrawer && (
+            <div 
+              className="fixed inset-0 bg-black/50 z-[60]"
+              onClick={() => setShowDrawer(false)}
+            />
+          )}
+          
+          {/* Drawer from Bottom */}
+          <div 
+            className={`fixed inset-x-0 bottom-0 bg-white z-[70] rounded-t-3xl shadow-2xl transform transition-transform duration-300 ease-out flex flex-col ${
+              showDrawer ? 'translate-y-0' : 'translate-y-full'
+            }`}
+            style={{ maxHeight: '85vh' }}
+          >
+            {/* Drawer Handle */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+            </div>
+
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-100">
+              <div>
+                <h2 className="text-lg font-bold text-brand-heading">DUI Checkpoints</h2>
+                <p className="text-xs text-gray-500">{filteredCheckpoints.length} locations found</p>
+              </div>
+              <button 
+                onClick={() => setShowDrawer(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Drawer Content */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <CheckpointList />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Detail Modal - Only opens from View Details button */}
       {detailCheckpoint && (
