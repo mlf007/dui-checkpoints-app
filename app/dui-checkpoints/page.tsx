@@ -26,7 +26,8 @@ export default function CheckpointsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null)
-  const itemsPerPage = 10
+  const [isInIframe, setIsInIframe] = useState(false)
+  const itemsPerPage = 15
 
   // Detect mobile/tablet view and set default view mode
   useEffect(() => {
@@ -38,6 +39,13 @@ export default function CheckpointsPage() {
       if (isSmallScreen) {
         setViewMode('grid')
       }
+    }
+    
+    // Check if in iframe
+    try {
+      setIsInIframe(window.self !== window.top)
+    } catch (e) {
+      setIsInIframe(true) // If we can't access window.top, we're likely in an iframe
     }
     
     // Set initial state
@@ -52,24 +60,45 @@ export default function CheckpointsPage() {
   // Send height to parent window for iframe embedding
   useEffect(() => {
     const sendHeight = () => {
-      const height = document.documentElement.scrollHeight
-      window.parent.postMessage({ type: 'resize', height }, '*')
+      // Get the actual content height by measuring the container
+      const container = document.getElementById('checkpoint-container')
+      
+      if (container) {
+        // Force a reflow to get accurate height
+        const rect = container.getBoundingClientRect()
+        const height = Math.ceil(rect.height) + 20 // Add small buffer
+        
+        window.parent.postMessage({ type: 'resize', height }, '*')
+      }
     }
 
     // Send initial height after content loads
-    const timer = setTimeout(sendHeight, 100)
+    const timer = setTimeout(sendHeight, 150)
+    
+    // Debounce function
+    let debounceTimer: NodeJS.Timeout
+    const debouncedSendHeight = () => {
+      clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(sendHeight, 100)
+    }
 
     // Send height on resize
-    window.addEventListener('resize', sendHeight)
+    window.addEventListener('resize', debouncedSendHeight)
     
-    // Use ResizeObserver to detect content size changes
-    const resizeObserver = new ResizeObserver(sendHeight)
-    resizeObserver.observe(document.body)
+    // Use MutationObserver to detect DOM changes
+    const mutationObserver = new MutationObserver(debouncedSendHeight)
+    mutationObserver.observe(document.body, { 
+      childList: true, 
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    })
 
     return () => {
       clearTimeout(timer)
-      window.removeEventListener('resize', sendHeight)
-      resizeObserver.disconnect()
+      clearTimeout(debounceTimer)
+      window.removeEventListener('resize', debouncedSendHeight)
+      mutationObserver.disconnect()
     }
   })
 
@@ -184,7 +213,7 @@ export default function CheckpointsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div id="checkpoint-container" className={`bg-gray-50 dark:bg-gray-900 ${isInIframe ? '' : 'min-h-screen'}`}>
       {/* Header */}
      
 
@@ -607,7 +636,8 @@ export default function CheckpointsPage() {
       {/* Mobile Dialog for Checkpoint Details */}
       {selectedCheckpoint && (
         <div 
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+          className="fixed inset-0 flex items-end md:items-center justify-center"
+          style={{ zIndex: 99999 }}
           onClick={() => setSelectedCheckpoint(null)}
         >
           {/* Backdrop */}
@@ -616,6 +646,7 @@ export default function CheckpointsPage() {
           {/* Dialog */}
           <div 
             className="relative bg-white dark:bg-gray-900 w-full md:max-w-lg md:mx-4 md:rounded-lg rounded-t-2xl max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom duration-300 md:slide-in-from-bottom-0 md:zoom-in-95"
+            style={{ zIndex: 100000 }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Handle bar for mobile */}
