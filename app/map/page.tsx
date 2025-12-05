@@ -72,20 +72,31 @@ export default function MapPage() {
       const originalPosition = document.body.style.position
       const originalTop = document.body.style.top
       const originalWidth = document.body.style.width
+      const originalHeight = document.body.style.height
       
       document.body.style.overflow = 'hidden'
       document.body.style.position = 'fixed'
       document.body.style.top = `-${scrollY}px`
       document.body.style.width = '100%'
-      document.body.style.touchAction = 'none'
+      document.body.style.height = '100%'
+      // Don't block touch on body - let map handle its own touches
+      
+      // Trigger map resize after a short delay
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'))
+      }, 150)
       
       return () => {
         document.body.style.overflow = originalOverflow
         document.body.style.position = originalPosition
         document.body.style.top = originalTop
         document.body.style.width = originalWidth
-        document.body.style.touchAction = ''
+        document.body.style.height = originalHeight
         window.scrollTo(0, scrollY)
+        // Trigger map resize when drawer closes
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'))
+        }, 150)
       }
     }
   }, [isMobile, showDrawer])
@@ -98,20 +109,30 @@ export default function MapPage() {
       const originalPosition = document.body.style.position
       const originalTop = document.body.style.top
       const originalWidth = document.body.style.width
+      const originalHeight = document.body.style.height
       
       document.body.style.overflow = 'hidden'
       document.body.style.position = 'fixed'
       document.body.style.top = `-${scrollY}px`
       document.body.style.width = '100%'
-      document.body.style.touchAction = 'none'
+      document.body.style.height = '100%'
+      
+      // Trigger map resize after a short delay
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'))
+      }, 150)
       
       return () => {
         document.body.style.overflow = originalOverflow
         document.body.style.position = originalPosition
         document.body.style.top = originalTop
         document.body.style.width = originalWidth
-        document.body.style.touchAction = ''
+        document.body.style.height = originalHeight
         window.scrollTo(0, scrollY)
+        // Trigger map resize when modal closes
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'))
+        }, 150)
       }
     }
   }, [isMobile, detailCheckpoint])
@@ -409,8 +430,8 @@ export default function MapPage() {
         position: 'fixed', 
         width: '100%', 
         height: '100%',
-        overflow: 'hidden',
-        touchAction: 'none'
+        overflow: 'hidden'
+        // Don't block touch - let map handle its own gestures
       } : {}}
     >
       {/* Header - Desktop: Full header with phone, Mobile: Centered logo */}
@@ -451,7 +472,15 @@ export default function MapPage() {
         )}
 
         {/* Map Container */}
-        <div className="flex-1 relative">
+        <div 
+          className="flex-1 relative"
+          style={{ 
+            minHeight: 0, // Important for flex children
+            width: '100%',
+            height: '100%',
+            touchAction: 'pan-x pan-y pinch-zoom' // Allow map gestures
+          }}
+        >
           <MapContainer
             checkpoints={filteredCheckpoints}
             selectedCheckpoint={selectedCheckpoint}

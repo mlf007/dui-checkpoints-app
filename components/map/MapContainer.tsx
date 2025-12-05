@@ -353,6 +353,13 @@ export default function MapContainer({
       center: center,
       zoom: zoom,
       zoomControl: false,
+      // Mobile-specific options
+      tap: true,
+      touchZoom: true,
+      doubleClickZoom: true,
+      boxZoom: false,
+      keyboard: false,
+      scrollWheelZoom: false, // Disable scroll wheel on mobile
     })
 
     L.control.zoom({ position: 'bottomright' }).addTo(map)
@@ -364,7 +371,26 @@ export default function MapContainer({
 
     mapRef.current = map
 
+    // Force map to recalculate size on mobile after initialization
+    setTimeout(() => {
+      map.invalidateSize()
+    }, 100)
+
+    // Handle window resize and orientation change on mobile
+    const handleResize = () => {
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize()
+        }
+      }, 100)
+    }
+
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('orientationchange', handleResize)
+
     return () => {
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('orientationchange', handleResize)
       map.remove()
       mapRef.current = null
       initializedRef.current = false
@@ -580,7 +606,14 @@ export default function MapContainer({
     <div 
       ref={mapContainerRef} 
       className="w-full h-full"
-      style={{ minHeight: '400px' }}
+      style={{ 
+        minHeight: '400px',
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        zIndex: 0,
+        touchAction: 'pan-x pan-y pinch-zoom'
+      }}
     />
   )
 }
