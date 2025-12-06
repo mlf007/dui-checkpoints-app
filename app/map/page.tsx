@@ -263,8 +263,9 @@ export default function MapPage() {
   // Format date - display exactly as stored in database (no conversion)
   const formatDate = useCallback((dateString: string | null) => {
     if (!dateString) return 'Date TBD'
-    // Return date exactly as it comes from database
-    return dateString
+    // Ensure it's a string and return exactly as it comes from database
+    // Convert to string explicitly to prevent any Date object conversion
+    return String(dateString)
   }, [])
 
   // Dynamic color generation for counties

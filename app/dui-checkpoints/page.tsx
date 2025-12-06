@@ -114,11 +114,13 @@ export default function CheckpointsPage() {
       
       if (data.success && data.checkpoints) {
         // Sort by date (latest first - descending order)
+        // Use string comparison to avoid timezone issues
         const sorted = [...data.checkpoints].sort((a: Checkpoint, b: Checkpoint) => {
           if (!a.Date && !b.Date) return 0
           if (!a.Date) return 1
           if (!b.Date) return -1
-          return new Date(b.Date).getTime() - new Date(a.Date).getTime()
+          // Compare date strings directly (YYYY-MM-DD format sorts correctly as strings)
+          return b.Date.localeCompare(a.Date)
         })
         setCheckpoints(sorted)
       } else {
@@ -193,8 +195,9 @@ export default function CheckpointsPage() {
   // Format date - display exactly as stored in database (no conversion)
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Date TBD'
-    // Return date exactly as it comes from database
-    return dateString
+    // Ensure it's a string and return exactly as it comes from database
+    // Convert to string explicitly to prevent any Date object conversion
+    return String(dateString)
   }
 
   const isUpcoming = (dateString: string | null) => {
