@@ -192,12 +192,20 @@ export default function CheckpointsPage() {
     return new Date(year, month - 1, day) // month is 0-indexed
   }
 
-  // Format date - display exactly as stored in database (no conversion)
+  // Format date - display as "Dayname, Date Monthname Year" (e.g., "Sunday, 21 December 2025")
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Date TBD'
-    // Ensure it's a string and return exactly as it comes from database
-    // Convert to string explicitly to prevent any Date object conversion
-    return String(dateString)
+    try {
+      const date = parseLocalDate(dateString)
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
+      const day = date.getDate()
+      const monthName = date.toLocaleDateString('en-US', { month: 'long' })
+      const year = date.getFullYear()
+      return `${dayName}, ${day} ${monthName} ${year}`
+    } catch (error) {
+      // Fallback to original string if parsing fails
+      return String(dateString)
+    }
   }
 
   const isUpcoming = (dateString: string | null) => {
