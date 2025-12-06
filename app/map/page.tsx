@@ -49,7 +49,7 @@ export default function MapPage() {
   const [isMobile, setIsMobile] = useState(false)
   const [mapCenter] = useState<[number, number]>([36.7783, -119.4179])
   const [mapZoom] = useState(6)
-  const [filterMode, setFilterMode] = useState<'upcoming' | 'all'>('all')
+  const [filterMode, setFilterMode] = useState<'upcoming' | 'all'>('upcoming')
   const [mounted, setMounted] = useState(false)
 
   // Mark component as mounted (client-side only)
