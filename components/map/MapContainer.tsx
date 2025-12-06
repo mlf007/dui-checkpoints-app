@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Checkpoint } from '@/lib/types/checkpoint'
+import { getLocationColor } from '@/lib/utils/colors'
 
 // Fix for default marker icons in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -23,30 +24,10 @@ interface MapContainerProps {
   onViewDetails: (checkpoint: Checkpoint) => void
 }
 
-// County colors for markers
-const countyColors: Record<string, string> = {
-  'Imperial': '#DC2626',
-  'L.A': '#E86C2C',
-  'L.A ': '#E86C2C',
-  'LA': '#F59E0B',
-  'Alameda': '#059669',
-  'Alameda ': '#059669',
-  'Placer County': '#7C3AED',
-  'San diego': '#2563EB',
-  'Riverside': '#EC4899',
-  'Monterey': '#0891B2',
-  'Solono': '#CA8A04',
-  'Fresno County': '#BE185D',
-}
-
-// Default color for unknown counties
-const defaultColor = '#6B7280'
-
-// Get color for a county
+// Dynamic color generation for counties - uses hash-based color assignment
+// Same county name always gets the same color, works for any county across the country
 function getCountyColor(county: string | null): string {
-  if (!county) return defaultColor
-  const trimmed = county.trim()
-  return countyColors[trimmed] || countyColors[county] || defaultColor
+  return getLocationColor(county)
 }
 
 // Custom marker icons
@@ -88,52 +69,103 @@ const userLocationIcon = L.divIcon({
   iconAnchor: [12, 12],
 })
 
-// City coordinates (fixed)
-const cityCoords: Record<string, [number, number]> = {
-  'El Centro': [32.792, -115.563],
-  'Glendora': [34.136, -117.865],
-  'Monterey Park': [34.062, -118.123],
-  'Pleasanton': [37.663, -121.875],
-  'Union City': [37.596, -122.019],
-  ' Union City': [37.596, -122.019],
-  'Lincoln': [38.891, -121.293],
-  'Oceanside': [33.196, -117.380],
-  'Oceanside ': [33.196, -117.380],
-  'San Jacinto': [33.784, -116.958],
-  'Greenfield': [36.321, -121.244],
-  'Greenfield ': [36.321, -121.244],
-  'Vacaville': [38.357, -121.987],
-  'Vacaville ': [38.357, -121.987],
+// Cache for geocoded coordinates - persists across renders
+const coordsCache = new Map<string, [number, number]>()
+
+// Default center (California) when no coordinates found
+const DEFAULT_CENTER: [number, number] = [36.7783, -119.4179]
+
+// Geocode a location name to coordinates using Nominatim
+async function geocodeLocation(locationName: string, state: string = 'California'): Promise<[number, number] | null> {
+  try {
+    const query = `${locationName}, ${state}, USA`
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'DUI-Checkpoint-Map/1.0'
+      }
+    })
+    
+    if (!response.ok) return null
+    
+    const data = await response.json()
+    
+    if (data && data.length > 0) {
+      const { lat, lon } = data[0]
+      return [parseFloat(lat), parseFloat(lon)]
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Geocoding error:', error)
+    return null
+  }
 }
 
-const countyCoords: Record<string, [number, number]> = {
-  'Imperial': [32.792, -115.563],
-  'L.A': [34.052, -118.243],
-  'L.A ': [34.052, -118.243],
-  'LA': [34.052, -118.243],
-  'Alameda': [37.602, -122.061],
-  'Alameda ': [37.602, -122.061],
-  'Placer County': [38.891, -121.293],
-  'San diego': [32.716, -117.163],
-  'Riverside': [33.980, -117.375],
-  'Monterey': [36.600, -121.894],
-  'Solono': [38.357, -121.987],
-  'Fresno County': [36.746, -119.772],
-}
-
-// Get stable coordinates for a checkpoint
-function getCoordinates(checkpoint: Checkpoint): [number, number] | null {
+// Get coordinates for a checkpoint - tries city first, then county
+// Returns cached value or default, and triggers async geocoding if needed
+function getCoordinates(checkpoint: Checkpoint): [number, number] {
   const city = checkpoint.City?.trim()
-  if (city && cityCoords[city]) {
-    return cityCoords[city]
-  }
-
   const county = checkpoint.County?.trim()
-  if (county && countyCoords[county]) {
-    return countyCoords[county]
+  const state = checkpoint.State || 'CA'
+  
+  // Try city cache first
+  if (city) {
+    const cityKey = `city:${city}:${state}`.toLowerCase()
+    if (coordsCache.has(cityKey)) {
+      return coordsCache.get(cityKey)!
+    }
   }
+  
+  // Try county cache
+  if (county) {
+    const countyKey = `county:${county}:${state}`.toLowerCase()
+    if (coordsCache.has(countyKey)) {
+      return coordsCache.get(countyKey)!
+    }
+  }
+  
+  // Return default - async geocoding will update later
+  return DEFAULT_CENTER
+}
 
-  return [36.7783, -119.4179]
+// Async function to geocode and cache coordinates for a checkpoint
+async function geocodeCheckpoint(checkpoint: Checkpoint): Promise<[number, number]> {
+  const city = checkpoint.City?.trim()
+  const county = checkpoint.County?.trim()
+  const state = checkpoint.State === 'CA' ? 'California' : checkpoint.State || 'California'
+  
+  // Try city first
+  if (city) {
+    const cityKey = `city:${city}:${state}`.toLowerCase()
+    if (!coordsCache.has(cityKey)) {
+      const coords = await geocodeLocation(city, state)
+      if (coords) {
+        coordsCache.set(cityKey, coords)
+        return coords
+      }
+    } else {
+      return coordsCache.get(cityKey)!
+    }
+  }
+  
+  // Try county
+  if (county) {
+    const countyKey = `county:${county}:${state}`.toLowerCase()
+    if (!coordsCache.has(countyKey)) {
+      const countyName = county.includes('County') ? county : `${county} County`
+      const coords = await geocodeLocation(countyName, state)
+      if (coords) {
+        coordsCache.set(countyKey, coords)
+        return coords
+      }
+    } else {
+      return coordsCache.get(countyKey)!
+    }
+  }
+  
+  return DEFAULT_CENTER
 }
 
 // Fetch city boundary from Nominatim (OpenStreetMap)
@@ -360,7 +392,6 @@ export default function MapContainer({
       zoom: zoom,
       zoomControl: false,
       // Mobile-specific options
-      tap: true,
       touchZoom: true,
       doubleClickZoom: true,
       boxZoom: false,
@@ -407,17 +438,20 @@ export default function MapContainer({
     }
   }, [center, zoom])
 
-  // Update markers
+  // Update markers - FAST: Create all markers immediately, then batch geocode
   useEffect(() => {
     if (!mapRef.current) return
 
     const currentMarkerIds = new Set<string>()
 
+    // STEP 1: Create/update all markers IMMEDIATELY with cached/default coordinates
+    // This ensures all markers appear instantly on the map
     checkpoints.forEach((checkpoint) => {
-      const coords = getCoordinates(checkpoint)
-      if (!coords) return
-
       currentMarkerIds.add(checkpoint.id)
+      
+      // Get initial coordinates (cached or default - will be updated later if needed)
+      const coords = getCoordinates(checkpoint)
+      
       const isSelected = selectedCheckpoint?.id === checkpoint.id
       const isTodayCheckpoint = isToday(checkpoint.Date)
       const color = getCountyColor(checkpoint.County)
@@ -426,20 +460,22 @@ export default function MapContainer({
       let marker = markersRef.current.get(checkpoint.id)
 
       if (marker) {
+        // Update existing marker
         marker.setIcon(icon)
+        const currentLatLng = marker.getLatLng()
+        // Only update position if it's significantly different (not just default center)
+        if (Math.abs(currentLatLng.lat - coords[0]) > 0.01 || Math.abs(currentLatLng.lng - coords[1]) > 0.01) {
+          marker.setLatLng(coords)
+        }
       } else {
+        // Create new marker immediately
         marker = L.marker(coords, { icon })
           .addTo(mapRef.current!)
 
         const popupContent = document.createElement('div')
         popupContent.className = 'popup-content'
-        // Format date as local to avoid timezone issues
-        const formattedDate = checkpoint.Date 
-          ? (() => {
-              const [year, month, day] = checkpoint.Date.split('-').map(Number)
-              return new Date(year, month - 1, day).toLocaleDateString()
-            })()
-          : 'Date TBD'
+        // Display date exactly as stored in database (no conversion)
+        const formattedDate = checkpoint.Date || 'Date TBD'
         popupContent.innerHTML = `
           <div class="popup-title">${checkpoint.City || 'Unknown City'}</div>
           <div class="popup-county" style="color: ${color}">${checkpoint.County || ''}</div>
@@ -468,12 +504,83 @@ export default function MapContainer({
       }
     })
 
+    // Remove markers for checkpoints no longer in list
     markersRef.current.forEach((marker, id) => {
       if (!currentMarkerIds.has(id)) {
         marker.remove()
         markersRef.current.delete(id)
       }
     })
+
+    // STEP 2: Batch geocode missing coordinates in parallel (with rate limiting)
+    // This runs in the background and updates positions as they're found
+    const batchGeocode = async () => {
+      const checkpointsToGeocode: Array<{ checkpoint: Checkpoint; marker: L.Marker; key: string }> = []
+      
+      // Collect all checkpoints that need geocoding
+      checkpoints.forEach((checkpoint) => {
+        const marker = markersRef.current.get(checkpoint.id)
+        if (!marker) return
+        
+        const city = checkpoint.City?.trim()
+        const county = checkpoint.County?.trim()
+        const state = checkpoint.State || 'CA'
+        
+        const cityKey = city ? `city:${city}:${state}`.toLowerCase() : null
+        const countyKey = county ? `county:${county}:${state}`.toLowerCase() : null
+        
+        // Check if we need to geocode
+        const needsGeocoding = (cityKey && !coordsCache.has(cityKey)) || 
+                               (!cityKey && countyKey && !coordsCache.has(countyKey))
+        
+        if (needsGeocoding) {
+          checkpointsToGeocode.push({
+            checkpoint,
+            marker,
+            key: cityKey || countyKey || ''
+          })
+        }
+      })
+
+      // Process in batches of 5 to respect rate limits and avoid overwhelming the API
+      const BATCH_SIZE = 5
+      const DELAY_BETWEEN_BATCHES = 1000 // 1 second between batches
+      
+      for (let i = 0; i < checkpointsToGeocode.length; i += BATCH_SIZE) {
+        const batch = checkpointsToGeocode.slice(i, i + BATCH_SIZE)
+        
+        // Process batch in parallel
+        const geocodePromises = batch.map(async ({ checkpoint, marker }) => {
+          try {
+            const newCoords = await geocodeCheckpoint(checkpoint)
+            if (newCoords && mapRef.current && marker) {
+              // Only update if coordinates are significantly different from default
+              const currentLatLng = marker.getLatLng()
+              const isDefaultCenter = Math.abs(currentLatLng.lat - DEFAULT_CENTER[0]) < 0.1 &&
+                                     Math.abs(currentLatLng.lng - DEFAULT_CENTER[1]) < 0.1
+              
+              if (isDefaultCenter || 
+                  Math.abs(currentLatLng.lat - newCoords[0]) > 0.01 || 
+                  Math.abs(currentLatLng.lng - newCoords[1]) > 0.01) {
+                marker.setLatLng(newCoords)
+              }
+            }
+          } catch (error) {
+            console.warn('Geocoding failed for checkpoint:', checkpoint.id, error)
+          }
+        })
+        
+        await Promise.all(geocodePromises)
+        
+        // Small delay between batches to respect rate limits
+        if (i + BATCH_SIZE < checkpointsToGeocode.length) {
+          await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES))
+        }
+      }
+    }
+
+    // Start geocoding in background (don't await - let it run async)
+    batchGeocode()
   }, [checkpoints, selectedCheckpoint, onMarkerClick, isToday])
 
   // Update boundary overlay for selected checkpoint - ACTUAL CITY BOUNDARY

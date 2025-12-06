@@ -190,15 +190,11 @@ export default function CheckpointsPage() {
     return new Date(year, month - 1, day) // month is 0-indexed
   }
 
+  // Format date - display exactly as stored in database (no conversion)
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Date TBD'
-    const date = parseLocalDate(dateString)
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    })
+    // Return date exactly as it comes from database
+    return dateString
   }
 
   const isUpcoming = (dateString: string | null) => {

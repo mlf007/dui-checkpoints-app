@@ -16,6 +16,7 @@ import {
   Navigation
 } from 'lucide-react'
 import type { Checkpoint } from '@/lib/types/checkpoint'
+import { getLocationColor } from '@/lib/utils/colors'
 
 // Logo URL
 const LOGO_URL = 'https://cdn.prod.website-files.com/668db2607224f56857ad5d85/66ac964485eaa20383644e2f_Group%20206.png'
@@ -259,35 +260,17 @@ export default function MapPage() {
     return checkpointDate >= today
   }, [mounted, parseLocalDate])
 
-  // Format date
+  // Format date - display exactly as stored in database (no conversion)
   const formatDate = useCallback((dateString: string | null) => {
     if (!dateString) return 'Date TBD'
-    const date = parseLocalDate(dateString)
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    })
-  }, [parseLocalDate])
+    // Return date exactly as it comes from database
+    return dateString
+  }, [])
 
-  // County colors
-  const countyColors: Record<string, string> = {
-    'Imperial': '#DC2626',
-    'L.A': '#E86C2C',
-    'LA': '#F59E0B',
-    'Alameda': '#059669',
-    'Placer County': '#7C3AED',
-    'San diego': '#2563EB',
-    'Riverside': '#EC4899',
-    'Monterey': '#0891B2',
-    'Solono': '#CA8A04',
-    'Fresno County': '#BE185D',
-  }
-
-  const getCountyColor = (county: string | null) => {
-    if (!county) return '#6B7280'
-    return countyColors[county.trim()] || '#6B7280'
-  }
+  // Dynamic color generation for counties
+  const getCountyColor = useCallback((county: string | null) => {
+    return getLocationColor(county)
+  }, [])
 
   // Handle checkpoint selection (from list) - just highlight on map
   const handleCheckpointSelect = (checkpoint: Checkpoint) => {
