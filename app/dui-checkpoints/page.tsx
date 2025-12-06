@@ -182,9 +182,17 @@ export default function CheckpointsPage() {
     setCurrentPage(1)
   }, [cityFilter, countyFilter, searchQuery])
 
+  // Parse date string as local date (not UTC) to avoid timezone issues
+  // "2025-12-21" should display as Dec 21 regardless of user's timezone
+  const parseLocalDate = (dateString: string): Date => {
+    // Split the date string and create date with local timezone
+    const [year, month, day] = dateString.split('-').map(Number)
+    return new Date(year, month - 1, day) // month is 0-indexed
+  }
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Date TBD'
-    const date = new Date(dateString)
+    const date = parseLocalDate(dateString)
     return date.toLocaleDateString('en-US', { 
       weekday: 'long', 
       year: 'numeric', 
@@ -195,7 +203,7 @@ export default function CheckpointsPage() {
 
   const isUpcoming = (dateString: string | null) => {
     if (!dateString) return false
-    const checkpointDate = new Date(dateString)
+    const checkpointDate = parseLocalDate(dateString)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return checkpointDate >= today

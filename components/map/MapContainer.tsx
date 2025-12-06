@@ -186,12 +186,18 @@ export default function MapContainer({
     viewDetailsRef.current = onViewDetails
   }, [onViewDetails])
 
+  // Parse date as local (not UTC) to avoid timezone issues
+  const parseLocalDate = useCallback((dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }, [])
+
   const isToday = useCallback((dateString: string | null) => {
     if (!dateString) return false
-    const checkpointDate = new Date(dateString)
+    const checkpointDate = parseLocalDate(dateString)
     const today = new Date()
     return checkpointDate.toDateString() === today.toDateString()
-  }, [])
+  }, [parseLocalDate])
 
   // Initialize map
   useEffect(() => {
@@ -427,10 +433,17 @@ export default function MapContainer({
 
         const popupContent = document.createElement('div')
         popupContent.className = 'popup-content'
+        // Format date as local to avoid timezone issues
+        const formattedDate = checkpoint.Date 
+          ? (() => {
+              const [year, month, day] = checkpoint.Date.split('-').map(Number)
+              return new Date(year, month - 1, day).toLocaleDateString()
+            })()
+          : 'Date TBD'
         popupContent.innerHTML = `
           <div class="popup-title">${checkpoint.City || 'Unknown City'}</div>
           <div class="popup-county" style="color: ${color}">${checkpoint.County || ''}</div>
-          <div class="popup-date">${checkpoint.Date ? new Date(checkpoint.Date).toLocaleDateString() : 'Date TBD'}</div>
+          <div class="popup-date">${formattedDate}</div>
         `
         
         const btn = document.createElement('button')

@@ -173,6 +173,12 @@ export default function MapPage() {
   const filteredCheckpoints = useMemo(() => {
     if (checkpoints.length === 0) return []
     
+    // Helper to parse date as local (not UTC) to avoid timezone issues
+    const toLocalDate = (dateStr: string): Date => {
+      const [year, month, day] = dateStr.split('-').map(Number)
+      return new Date(year, month - 1, day)
+    }
+    
     let filtered = [...checkpoints]
 
     // Apply upcoming/all filter (only after mounted to avoid SSR date issues)
@@ -181,7 +187,7 @@ export default function MapPage() {
       today.setHours(0, 0, 0, 0)
       filtered = filtered.filter(cp => {
         if (!cp.Date) return false
-        const cpDate = new Date(cp.Date)
+        const cpDate = toLocalDate(cp.Date)
         cpDate.setHours(0, 0, 0, 0)
         return cpDate >= today
       })
@@ -199,8 +205,8 @@ export default function MapPage() {
 
     // Sort by date
     return filtered.sort((a, b) => {
-      const dateA = a.Date ? new Date(a.Date).getTime() : 0
-      const dateB = b.Date ? new Date(b.Date).getTime() : 0
+      const dateA = a.Date ? toLocalDate(a.Date).getTime() : 0
+      const dateB = b.Date ? toLocalDate(b.Date).getTime() : 0
       return dateA - dateB
     })
   }, [checkpoints, searchQuery, filterMode, mounted])
@@ -228,33 +234,41 @@ export default function MapPage() {
     )
   }, [])
 
+  // Parse date string as local date (not UTC) to avoid timezone issues
+  // "2025-12-21" should display as Dec 21 regardless of user's timezone
+  const parseLocalDate = useCallback((dateString: string): Date => {
+    // Split the date string and create date with local timezone
+    const [year, month, day] = dateString.split('-').map(Number)
+    return new Date(year, month - 1, day) // month is 0-indexed
+  }, [])
+
   // Check if checkpoint is today (only run on client)
   const isToday = useCallback((dateString: string | null) => {
     if (!mounted || !dateString) return false
-    const checkpointDate = new Date(dateString)
+    const checkpointDate = parseLocalDate(dateString)
     const today = new Date()
     return checkpointDate.toDateString() === today.toDateString()
-  }, [mounted])
+  }, [mounted, parseLocalDate])
 
   // Check if checkpoint is upcoming (only run on client)
   const isUpcoming = useCallback((dateString: string | null) => {
     if (!mounted || !dateString) return false
-    const checkpointDate = new Date(dateString)
+    const checkpointDate = parseLocalDate(dateString)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return checkpointDate >= today
-  }, [mounted])
+  }, [mounted, parseLocalDate])
 
   // Format date
-  const formatDate = (dateString: string | null) => {
+  const formatDate = useCallback((dateString: string | null) => {
     if (!dateString) return 'Date TBD'
-    const date = new Date(dateString)
+    const date = parseLocalDate(dateString)
     return date.toLocaleDateString('en-US', { 
       weekday: 'short', 
       month: 'short', 
       day: 'numeric' 
     })
-  }
+  }, [parseLocalDate])
 
   // County colors
   const countyColors: Record<string, string> = {
