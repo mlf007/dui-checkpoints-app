@@ -377,7 +377,7 @@ export default function CheckpointsPage() {
                               <td className="px-6 py-4 text-sm whitespace-nowrap">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                   isUpcoming(checkpoint.Date)
-                                    ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-200'
+                                    ? 'bg-red-100 text-red-500 dark:bg-red-900 dark:text-red-500'
                                     : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                 }`}>
                                   {formatDate(checkpoint.Date)}
