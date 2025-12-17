@@ -228,7 +228,7 @@ export default function CheckpointsPage() {
   }
 
   return (
-    <div id="checkpoint-container" className={`bg-gray-50 dark:bg-gray-900 ${isInIframe ? '' : 'min-h-screen'}`}>
+    <div id="checkpoint-container" className={`bg-[#FAFAFA] dark:bg-gray-900 ${isInIframe ? '' : 'min-h-screen'}`}>
       {/* Header */}
      
 
