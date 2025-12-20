@@ -27,7 +27,7 @@ export default function CheckpointsPage() {
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null)
   const [isInIframe, setIsInIframe] = useState(false)
-  const itemsPerPage = 15
+  const itemsPerPage = 20
 
   // Detect mobile/tablet view and set default view mode
   useEffect(() => {
