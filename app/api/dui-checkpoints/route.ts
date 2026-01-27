@@ -4,7 +4,7 @@ import type { Checkpoint, CheckpointResponse, CheckpointError } from "@/lib/type
 
 // CORS headers for embed script access
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://themeehanlawfirm.com, https://meehanlawdui-checkpoints.rork.app",
+  "Access-Control-Allow-Origin": "https://themeehanlawfirm.com, https://meehanlawdui-checkpoints.rork.app, https://rork.com",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
