@@ -10,7 +10,9 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: "frame-ancestors 'self' https://themeehanlawfirm.com",
+            // Allow only self and the production locator page host
+            value:
+              "frame-ancestors 'self' https://themeehanlawfirm.com https://www.themeehanlawfirm.com",
           },
         ],
       },
