@@ -47,11 +47,20 @@ export async function GET(
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
 
-    const checkpointId = searchParams.get("checkpointId");
+    const checkpointIdParam = searchParams.get("checkpointId");
 
-    if (!checkpointId) {
+    if (!checkpointIdParam) {
       return NextResponse.json(
         { error: "Missing required query parameter: checkpointId" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    const checkpointId = Number(checkpointIdParam);
+
+    if (Number.isNaN(checkpointId)) {
+      return NextResponse.json(
+        { error: "Invalid checkpointId, must be a number" },
         { status: 400, headers: corsHeaders }
       );
     }
