@@ -9,6 +9,7 @@ export interface Checkpoint {
   Time: string;
   Source: string;
   created_at: string;
+  mapurl?: string | null;
 }
 
 export interface CheckpointResponse {

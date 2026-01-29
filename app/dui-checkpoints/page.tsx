@@ -346,7 +346,7 @@ export default function CheckpointsPage() {
                       <tr>
                         <th className="px-6 py-4 text-left text-sm font-semibold">City</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">County</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold">Location</th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold">Exact Previous Locations</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Date</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Time</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Details</th>
@@ -412,16 +412,29 @@ export default function CheckpointsPage() {
                                     <p className="text-sm text-brand-paragraph dark:text-gray-300 whitespace-pre-line leading-relaxed">
                                       {checkpoint.Description || 'No description available.'}
                                     </p>
-                                    {checkpoint.Source && (
-                                      <a
-                                        href={checkpoint.Source}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 mt-3 text-sm text-brand-orange hover:underline"
-                                      >
-                                        View Original Source →
-                                      </a>
-                                    )}
+                                    <div className="flex flex-wrap items-center gap-4 mt-3">
+                                      {checkpoint.Source && (
+                                        <a
+                                          href={checkpoint.Source}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 text-sm text-brand-orange hover:underline"
+                                        >
+                                          View Original Source →
+                                        </a>
+                                      )}
+                                      {checkpoint.mapurl && (
+                                        <a
+                                          href={checkpoint.mapurl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 text-sm text-brand-orange hover:underline"
+                                        >
+                                          <MapPin className="h-4 w-4" />
+                                          View on Google Maps →
+                                        </a>
+                                      )}
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
@@ -738,17 +751,30 @@ export default function CheckpointsPage() {
                   </p>
                 </div>
                 
-                {/* Source Link */}
-                {selectedCheckpoint.Source && (
-                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <a
-                      href={selectedCheckpoint.Source}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-sm text-brand-orange hover:underline font-medium"
-                    >
-                      View Original Source →
-                    </a>
+                {/* Source & Map Links */}
+                {(selectedCheckpoint.Source || selectedCheckpoint.mapurl) && (
+                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-4">
+                    {selectedCheckpoint.Source && (
+                      <a
+                        href={selectedCheckpoint.Source}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-brand-orange hover:underline font-medium"
+                      >
+                        View Original Source →
+                      </a>
+                    )}
+                    {selectedCheckpoint.mapurl && (
+                      <a
+                        href={selectedCheckpoint.mapurl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-brand-orange hover:underline font-medium"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        View on Google Maps →
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
